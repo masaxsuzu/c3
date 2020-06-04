@@ -81,10 +81,10 @@ fn primary(s: &str) -> IResult<&str, Node> {
 
         return Ok((x, node));
     }
-    parse_number(s)
+    num(s)
 }
 
-fn parse_number(s: &str) -> IResult<&str, Node> {
+fn num(s: &str) -> IResult<&str, Node> {
     let (s, v1) = digit1(s)?;
     Ok((s, Node::Number(v1.parse().unwrap())))
 }
