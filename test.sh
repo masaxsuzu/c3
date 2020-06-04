@@ -4,7 +4,7 @@ assert() {
   want="$1"
   input="$2"
 
-  cargo run -q "$input" > tmp.s
+  cargo run -q -- "$input" > tmp.s
   cc -o tmp tmp.s
   ./tmp
   got="$?"
@@ -16,6 +16,10 @@ assert() {
     exit 1
   fi
 }
+
+assert 10 '-10+20'
+assert 10 '- -10'
+assert 10 '- - +10'
 
 assert 41 ' 12 + 34 - 5 '
 

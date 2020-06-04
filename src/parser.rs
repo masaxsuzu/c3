@@ -46,9 +46,9 @@ fn expr(s: &str) -> IResult<&str, Node> {
     }
 }
 
-// mul = primary ("*" primary | "/" primary)*
+// mul = unary ("*" unary | "/" unary)*
 fn mul(s: &str) -> IResult<&str, Node> {
-    let (mut x, mut left) = primary(s)?;
+    let (mut x, mut left) = unary(s)?;
 
     loop {
         let (y, _) = multispace0(x)?;
@@ -57,7 +57,7 @@ fn mul(s: &str) -> IResult<&str, Node> {
             tag::<&str, &str, (&str, ErrorKind)>("/"),
         ))(y)
         {
-            let (z, right) = mul(y)?;
+            let (z, right) = unary(y)?;
             x = z;
             match op {
                 "*" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul),
@@ -68,6 +68,21 @@ fn mul(s: &str) -> IResult<&str, Node> {
             return Ok((x, left));
         }
     }
+}
+
+// unary = ("+" | "-") unary
+//       | primary
+fn unary(s: &str) -> IResult<&str, Node> {
+    let (s, _) = multispace0(s)?;
+    if let Ok((x, _)) = tag::<&str, &str, (&str, ErrorKind)>("+")(s) {
+        return unary(x);
+    }
+    if let Ok((x, _)) = tag::<&str, &str, (&str, ErrorKind)>("-")(s) {
+        let left = Node::Number(0);
+        let (x, right) = unary(x)?;
+        return Ok((x, Node::Binary(Box::new(Binary { left, right }), Operator::Sub)));
+    }
+    primary(s)
 }
 
 // primary = "(" expr ")" | num
