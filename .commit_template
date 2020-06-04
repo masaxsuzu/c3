@@ -1,0 +1,16 @@
+
+
+# ==================== Emojis ====================
+# ✨  :sparkles: 新機能（New Feature）
+# 🐛  :bug: バグ修正（Bagfix）
+# 🧹  :broom: リファクタリング(Refactoring)
+# 📈  :chart increasing: パフォーマンス（Performance）
+# 🔧  :wrench: ツール（Tooling）
+# 💩  :hankey: 非推奨追加（Deprecation）
+# 🗑️  :wastebasket: 削除（Removal）
+# 🚧  :construction: WIP(Work In Progress)
+
+# ==================== Format ====================
+# :emoji: Subject
+#
+# Commit body...
