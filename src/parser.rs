@@ -52,14 +52,20 @@ fn tag<'a>(p: Parser<'a>, s: &str) -> Result<(Parser<'a>, Node), Error> {
     if t.is_reserved(s) {
         return Ok((p.next(1), Node::Null));
     }
-    Err(Error::ParseError(format!("{:?}: not {}", p.nth(0),s)))
+    Err(Error::ParseError(format!("{:?}: not {}", p.nth(0), s)))
 }
 
 // stmt = expr ";"
 fn stmt(p: Parser) -> Result<(Parser, Node), Error> {
-    let (p, n) = expr(p)?;
+    let (p, n) = if let Ok((p, _)) = tag(p.next(0), "return") {
+        let (p, n) = expr(p)?;
+        (p, Node::Return(Box::new(Unary { left: n })))
+    } else {
+        let (p, n) = expr(p)?;
+        (p, Node::ExprStmt(Box::new(Unary { left: n })))
+    };
     let (p, _) = tag(p, ";")?;
-    Ok((p, Node::ExprStmt(Box::new(Unary { left: n }))))
+    Ok((p, n))
 }
 
 // expr = equality

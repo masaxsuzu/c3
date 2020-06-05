@@ -3,6 +3,7 @@ pub enum Node {
     Program(Box<Program>),
     Number(i64),
     ExprStmt(Box<Unary>),
+    Return(Box<Unary>),
     Binary(Box<Binary>, Operator),
     Null,
 }

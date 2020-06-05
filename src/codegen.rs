@@ -16,7 +16,7 @@ pub fn gen(program: Program) {
     for stmt in program.nodes {
         gen_stmt(stmt, 0);
     }
-
+    print!(".L.return:\n");
     print!("  pop r12\n");
     print!("  pop r13\n");
     print!("  pop r14\n");
@@ -29,7 +29,12 @@ fn gen_stmt(node: Node, top: usize) -> usize {
     match node {
         Node::ExprStmt(stmt) => {
             let top = gen_expr(stmt.left, top) - 1;
+            return top;
+        }
+        Node::Return(expr) => {
+            let top = gen_expr(expr.left, top) - 1;
             print!("  mov rax, {}\n", REG[top]);
+            print!("  jmp .L.return\n\n");
             return top;
         }
         _ => {

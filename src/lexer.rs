@@ -29,22 +29,11 @@ impl<'a> Lexer<'a> {
         self.skip_whitespace();
         let token = match self.ch {
             b'0'..=b'9' => return self.consume_number(),
-            b'+' => return self.consume_keyword(self.ch),
-            b'-' => return self.consume_keyword(self.ch),
-            b'*' => return self.consume_keyword(self.ch),
-            b'/' => return self.consume_keyword(self.ch),
-            b'!' => return self.consume_keyword(self.ch),
-            b'=' => return self.consume_keyword(self.ch),
-            b'<' => return self.consume_keyword(self.ch),
-            b'>' => return self.consume_keyword(self.ch),
-            b';' => return self.consume_keyword(self.ch),
             0 => Token::Eof,
-            x => Token::Illegal(x),
+            _ => return self.consume_keyword(self.ch),
         };
 
-        self.read_char();
-
-        return token;
+        token
     }
 
     fn consume_number(&mut self) -> Token<'a> {
@@ -68,6 +57,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
+        if self.starts_with("return") && !Self::is_alnum(self.nth_char(6)) {
+            self.read_n(6);
+            return Token::Reserved("return");
+        }
+
         for p in self.two_letter_keywords.iter() {
             if self.starts_with(p) {
                 let token: Token<'a> = Token::Reserved(*p);
@@ -83,6 +77,7 @@ impl<'a> Lexer<'a> {
                 return token;
             }
         }
+        &self.read_char();
         Token::Illegal(start)
     }
 
@@ -98,6 +93,12 @@ impl<'a> Lexer<'a> {
         word == consumed
     }
 
+    fn read_n(&mut self, n: usize) {
+        for _ in 0..n {
+            self.read_char();
+        }
+    }
+
     fn read_char(&mut self) {
         if self.next_pos >= self.input.len() {
             self.ch = 0;
@@ -107,6 +108,32 @@ impl<'a> Lexer<'a> {
         self.ch = self.input.as_bytes()[self.next_pos];
         self.pos = self.next_pos;
         self.next_pos += 1;
+    }
+
+    fn is_alpha(ch: u8) -> bool {
+        match ch {
+            b'a'..=b'z' => true,
+            b'A'..=b'Z' => true,
+            b'_' => true,
+            _ => false,
+        }
+    }
+
+    fn is_alnum(ch: u8) -> bool {
+        match ch {
+            b'0'..=b'9' => true,
+            c => Self::is_alpha(c),
+        }
+    }
+
+    fn nth_char(&self, n: usize) -> u8 {
+        let max = self.input.len();
+        let ch = if self.pos + n < max {
+            self.input.as_bytes()[self.pos + n]
+        } else {
+            0
+        };
+        ch
     }
 
     fn skip_whitespace(&mut self) {
@@ -125,7 +152,7 @@ impl<'a> Iterator for Lexer<'a> {
         match self.next_token() {
             Token::Eof => None,
             x => {
-                // print!("# {:?}\n",x);
+                print!("# {:?}\n", x);
                 Some(x)
             }
         }
