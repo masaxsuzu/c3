@@ -1,18 +1,14 @@
-#[derive(Debug, PartialEq, Eq)]
-pub enum Error {
-    ParseError(String),
-}
-
 extern crate nom;
 use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{digit1, multispace0},
-    error::ErrorKind,
+    error::{ErrorKind},
     IResult,
 };
 
 use crate::ast::{Binary, Node, Operator};
+use crate::error::Error;
 
 pub fn parse(s: &str) -> Result<Node, Error> {
     match expr(s) {
