@@ -4,6 +4,7 @@ pub enum Node {
     Number(i64),
     ExprStmt(Box<Unary>),
     Binary(Box<Binary>, Operator),
+    Null,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -3,6 +3,3 @@ name = "c3"
 version = "0.1.0"
 authors = ["masaxsuzu <masaxsuzu+github@gmail.com>"]
 edition = "2018"
-
-[dependencies]
-nom = "5.0.0"

@@ -1,203 +1,221 @@
-extern crate nom;
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::{digit1, multispace0},
-    error::ErrorKind,
-    IResult,
-};
-
 use crate::ast::{Binary, Node, Operator, Program, Unary};
 use crate::error::Error;
+use crate::token::Token;
+use std::rc::Rc;
 
-pub fn parse(s: &str) -> Result<Program, Error> {
-    let mut nodes = Vec::<Node>::new();
-    let mut x = s;
-    loop {
-        x = spaces(x);
-        if x == "" {
-            break;
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parser<'a> {
+    tokens: Rc<Vec<Token<'a>>>,
+    pos: usize,
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(pos: usize, input: Rc<Vec<Token<'a>>>) -> Self {
+        let p = Parser {
+            tokens: input,
+            pos: pos,
+        };
+        p
+    }
+
+    pub fn next(&self, n: usize) -> Self {
+        Parser::new(self.pos + n, Rc::clone(&self.tokens))
+    }
+
+    pub fn nth(&self, n: usize) -> Token {
+        let i = self.pos + n;
+        if i >= self.tokens.len() {
+            return Token::Eof;
         }
-        match stmt(x) {
-            Ok((y, n)) => {
-                x = y;
+        return self.tokens[self.pos + n];
+    }
+}
+
+pub fn parse(mut p: Parser) -> Result<Program, Error> {
+    let mut nodes = Vec::<Node>::new();
+    while p.nth(0) != Token::Eof {
+        match stmt(p) {
+            Ok((p1, n)) => {
+                p = p1;
                 nodes.push(n);
             }
             Err(e) => {
-                return Err(Error::ParseError(e.to_string()));
+                return Err(e);
             }
         }
     }
     Ok(Program { nodes: nodes })
 }
 
-fn spaces(s: &str) -> &str {
-    if let Ok((x, _)) = multispace0::<&str, (&str, ErrorKind)>(s) {
-        return x;
+fn tag<'a>(p: Parser<'a>, s: &str) -> Result<(Parser<'a>, Node), Error> {
+    let t = &p.nth(0);
+    if t.is_reserved(s) {
+        return Ok((p.next(1), Node::Null));
     }
-    s
+    Err(Error::ParseError(format!("{:?}: not {}", p.nth(0),s)))
 }
 
 // stmt = expr ";"
-fn stmt(s: &str) -> IResult<&str, Node> {
-    let (s, n) = expr(s)?;
-    let (s, _) = multispace0(s)?;
-    let (s, _) = tag(";")(s)?;
-    Ok((s, Node::ExprStmt(Box::new(Unary { left: n }))))
+fn stmt(p: Parser) -> Result<(Parser, Node), Error> {
+    let (p, n) = expr(p)?;
+    let (p, _) = tag(p, ";")?;
+    Ok((p, Node::ExprStmt(Box::new(Unary { left: n }))))
 }
 
 // expr = equality
-fn expr(s: &str) -> IResult<&str, Node> {
-    equality(s)
+fn expr(p: Parser) -> Result<(Parser, Node), Error> {
+    equality(p)
 }
 
 // equality = relational ("==" relational | "!=" relational)*
-fn equality(s: &str) -> IResult<&str, Node> {
-    let (mut x, mut left) = relational(s)?;
+fn equality(p: Parser) -> Result<(Parser, Node), Error> {
+    let (mut p, mut left) = relational(p)?;
     loop {
-        let (y, _) = multispace0(x)?;
-        if let Ok((y, op)) = alt((
-            tag::<&str, &str, (&str, ErrorKind)>("=="),
-            tag::<&str, &str, (&str, ErrorKind)>("!="),
-        ))(y)
-        {
-            let (z, right) = relational(y)?;
-            x = z;
-            match op {
-                "==" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq),
-                "!=" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne),
-                _ => {}
-            }
-        } else {
-            return Ok((x, left));
+        if let Ok((p1, _)) = tag(p.next(0), "==") {
+            let (p1, right) = relational(p1)?;
+            p = p1;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq);
+            continue;
         }
+        if let Ok((p2, _)) = tag(p.next(0), "!=") {
+            let (p2, right) = relational(p2)?;
+            p = p2;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne);
+            continue;
+        }
+        return Ok((p.next(0), left));
     }
 }
 
 // relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
-fn relational(s: &str) -> IResult<&str, Node> {
-    let (mut x, mut left) = add(s)?;
+fn relational(p: Parser) -> Result<(Parser, Node), Error> {
+    let (mut p, mut left) = add(p)?;
     loop {
-        let (y, _) = multispace0(x)?;
-        if let Ok((y, op)) = alt((
-            tag::<&str, &str, (&str, ErrorKind)>("<="),
-            tag::<&str, &str, (&str, ErrorKind)>("<"),
-            tag::<&str, &str, (&str, ErrorKind)>(">="),
-            tag::<&str, &str, (&str, ErrorKind)>(">"),
-        ))(y)
-        {
-            let (z, right) = add(y)?;
-            x = z;
-            match op {
-                "<=" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Le),
-                "<" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt),
-                ">=" => {
-                    left = Node::Binary(
-                        Box::new(Binary {
-                            left: right,
-                            right: left,
-                        }),
-                        Operator::Le,
-                    )
-                }
-                ">" => {
-                    left = Node::Binary(
-                        Box::new(Binary {
-                            left: right,
-                            right: left,
-                        }),
-                        Operator::Lt,
-                    )
-                }
-                _ => {}
-            }
-        } else {
-            return Ok((x, left));
+        if let Ok((p1, _)) = tag(p.next(0), "<=") {
+            let (p1, right) = add(p1)?;
+            p = p1;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Le);
+            continue;
         }
+        if let Ok((p2, _)) = tag(p.next(0), "<") {
+            let (p2, right) = add(p2)?;
+            p = p2;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt);
+            continue;
+        }
+        if let Ok((p3, _)) = tag(p.next(0), ">=") {
+            let (p3, right) = add(p3)?;
+            p = p3;
+            left = Node::Binary(
+                Box::new(Binary {
+                    right: left,
+                    left: right,
+                }),
+                Operator::Le,
+            );
+            continue;
+        }
+        if let Ok((p4, _)) = tag(p.next(0), ">") {
+            let (p4, right) = add(p4)?;
+            p = p4;
+            left = Node::Binary(
+                Box::new(Binary {
+                    right: left,
+                    left: right,
+                }),
+                Operator::Lt,
+            );
+            continue;
+        }
+        return Ok((p.next(0), left));
     }
 }
 
 // add = mul ("+" mul | "-" mul)*
-fn add(s: &str) -> IResult<&str, Node> {
-    let (mut x, mut left) = mul(s)?;
-
+fn add(p: Parser) -> Result<(Parser, Node), Error> {
+    let (mut p, mut left) = mul(p)?;
     loop {
-        let (y, _) = multispace0(x)?;
-        if let Ok((y, op)) = alt((
-            tag::<&str, &str, (&str, ErrorKind)>("+"),
-            tag::<&str, &str, (&str, ErrorKind)>("-"),
-        ))(y)
-        {
-            let (z, right) = mul(y)?;
-            x = z;
-            match op {
-                "+" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Add),
-                "-" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub),
-                _ => {}
-            }
-        } else {
-            return Ok((x, left));
+        if let Ok((p1, _)) = tag(p.next(0), "+") {
+            let (p1, right) = mul(p1)?;
+            p = p1;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Add);
+            continue;
         }
+        if let Ok((p2, _)) = tag(p.next(0), "-") {
+            let (p2, right) = mul(p2)?;
+            p = p2;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub);
+            continue;
+        }
+        return Ok((p.next(0), left));
     }
 }
 
 // mul = unary ("*" unary | "/" unary)*
-fn mul(s: &str) -> IResult<&str, Node> {
-    let (mut x, mut left) = unary(s)?;
-
+fn mul(p: Parser) -> Result<(Parser, Node), Error> {
+    let (mut p, mut left) = unary(p)?;
     loop {
-        let (y, _) = multispace0(x)?;
-        if let Ok((y, op)) = alt((
-            tag::<&str, &str, (&str, ErrorKind)>("*"),
-            tag::<&str, &str, (&str, ErrorKind)>("/"),
-        ))(y)
-        {
-            let (z, right) = unary(y)?;
-            x = z;
-            match op {
-                "*" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul),
-                "/" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Div),
-                _ => {}
-            }
-        } else {
-            return Ok((x, left));
+        if let Ok((p1, _)) = tag(p.next(0), "*") {
+            let (p1, right) = unary(p1)?;
+            p = p1;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul);
+            continue;
         }
+        if let Ok((p2, _)) = tag(p.next(0), "/") {
+            let (p2, right) = unary(p2)?;
+            p = p2;
+            left = Node::Binary(Box::new(Binary { left, right }), Operator::Div);
+            continue;
+        }
+        return Ok((p.next(0), left));
     }
 }
 
 // unary = ("+" | "-") unary
 //       | primary
-fn unary(s: &str) -> IResult<&str, Node> {
-    let (s, _) = multispace0(s)?;
-    if let Ok((x, _)) = tag::<&str, &str, (&str, ErrorKind)>("+")(s) {
-        return unary(x);
-    }
-    if let Ok((x, _)) = tag::<&str, &str, (&str, ErrorKind)>("-")(s) {
-        let left = Node::Number(0);
-        let (x, right) = unary(x)?;
+fn unary(p: Parser) -> Result<(Parser, Node), Error> {
+    if let Ok((p, _)) = tag(p.next(0), "+") {
+        let (p, left) = unary(p)?;
         return Ok((
-            x,
-            Node::Binary(Box::new(Binary { left, right }), Operator::Sub),
+            p,
+            Node::Binary(
+                Box::new(Binary {
+                    left,
+                    right: Node::Number(0),
+                }),
+                Operator::Add,
+            ),
         ));
     }
-    primary(s)
+    if let Ok((p, _)) = tag(p.next(0), "-") {
+        let (p, right) = unary(p)?;
+        return Ok((
+            p,
+            Node::Binary(
+                Box::new(Binary {
+                    left: Node::Number(0),
+                    right: right,
+                }),
+                Operator::Sub,
+            ),
+        ));
+    }
+    primary(p)
 }
 
 // primary = "(" expr ")" | num
-fn primary(s: &str) -> IResult<&str, Node> {
-    let (s, _) = multispace0(s)?;
-    if let Ok((x, _)) = tag::<&str, &str, (&str, ErrorKind)>("(")(s) {
-        let (x, _) = multispace0(x)?;
-        let (x, node) = expr(x)?;
-        let (x, _) = multispace0(x)?;
-        let (x, _) = tag(")")(x)?;
-
-        return Ok((x, node));
+fn primary(p: Parser) -> Result<(Parser, Node), Error> {
+    if p.nth(0).is_reserved("(") {
+        let (p, node) = expr(p)?;
+        let (p, _) = tag(p, ";")?;
+        return Ok((p, node));
     }
-    num(s)
+    num(p)
 }
 
-fn num(s: &str) -> IResult<&str, Node> {
-    let (s, v1) = digit1(s)?;
-    Ok((s, Node::Number(v1.parse().unwrap())))
+fn num(p: Parser) -> Result<(Parser, Node), Error> {
+    if let Token::Number(i) = p.nth(0) {
+        return Ok((p.next(1), Node::Number(i)));
+    }
+    Err(Error::ParseError(format!("{:?}: not number", p.nth(0))))
 }
