@@ -1,11 +1,13 @@
-use crate::ast::{Binary, Node, Operator, Program, Unary};
+use crate::ast::{Binary, Node, Operator, Program, Unary, Variable};
 use crate::error::Error;
 use crate::token::Token;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parser<'a> {
     tokens: Rc<Vec<Token<'a>>>,
+    locals: Rc<RefCell<Vec<Variable>>>,
     pos: usize,
 }
 
@@ -14,26 +16,29 @@ impl<'a> Parser<'a> {
         let p = Parser {
             tokens: input,
             pos: pos,
+            locals: Rc::new(RefCell::new(Vec::new())),
         };
         p
     }
 
     pub fn next(&self, n: usize) -> Self {
-        Parser::new(self.pos + n, Rc::clone(&self.tokens))
+        let mut p = Parser::new(self.pos + n, Rc::clone(&self.tokens));
+        p.locals = Rc::clone(&self.locals);
+        p
     }
 
-    pub fn nth(&self, n: usize) -> Token {
+    pub fn nth(&self, n: usize) -> &Token {
         let i = self.pos + n;
         if i >= self.tokens.len() {
-            return Token::Eof;
+            return &Token::Eof;
         }
-        return self.tokens[self.pos + n];
+        return &self.tokens[self.pos + n];
     }
 }
 
 pub fn parse(mut p: Parser) -> Result<Program, Error> {
     let mut nodes = Vec::<Node>::new();
-    while p.nth(0) != Token::Eof {
+    while p.nth(0) != &Token::Eof {
         match stmt(p) {
             Ok((p1, n)) => {
                 p = p1;
@@ -228,14 +233,19 @@ fn primary(p: Parser) -> Result<(Parser, Node), Error> {
         return Ok((p, node));
     }
     if let Token::Identifier(x) = p.nth(0) {
-        return Ok((p.next(1), Node::Variable(x.to_string())));
+        return Ok((
+            p.next(1),
+            Node::Variable(Variable {
+                name: x.to_string(),
+            }),
+        ));
     }
     num(p)
 }
 
 fn num(p: Parser) -> Result<(Parser, Node), Error> {
     if let Token::Number(i) = p.nth(0) {
-        return Ok((p.next(1), Node::Number(i)));
+        return Ok((p.next(1), Node::Number(*i)));
     }
     Err(Error::ParseError(format!("{:?}: not number", p.nth(0))))
 }

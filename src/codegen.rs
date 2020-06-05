@@ -108,9 +108,9 @@ fn gen_expr(expr: Node, top: usize) -> usize {
     }
 }
 
-fn gen_addr(var: Node, top: usize) -> usize {
-    if let Node::Variable(name) = var {
-        let x = name.chars().next().unwrap() as u8;
+fn gen_addr(node: Node, top: usize) -> usize {
+    if let Node::Variable(var) = node {
+        let x = var.name.chars().next().unwrap() as u8;
         let base = 'a' as u8;
         let offset = ((x - base) + 1) * 8 + 32;
         print!("  lea {}, [rbp-{}]\n", REG[top], offset);

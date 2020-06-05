@@ -2,7 +2,7 @@
 pub enum Node {
     Program(Box<Program>),
     Number(i64),
-    Variable(String),
+    Variable(Variable),
     Assign(Box<Binary>),
     ExprStmt(Box<Unary>),
     Return(Box<Unary>),
@@ -25,6 +25,11 @@ pub enum Operator {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub nodes: Vec<Node>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Variable {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
