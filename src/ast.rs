@@ -1,6 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
+    Program(Box<Program>),
     Number(i64),
+    ExprStmt(Box<Unary>),
     Binary(Box<Binary>, Operator),
 }
 
@@ -14,6 +16,16 @@ pub enum Operator {
     Ne,
     Lt,
     Le,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Program {
+    pub nodes: Vec<Node>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Unary {
+    pub left: Node,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,8 +1,8 @@
-use crate::ast::{Node, Operator};
+use crate::ast::{Node, Operator, Program};
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 
-pub fn gen(expr: Node) {
+pub fn gen(program: Program) {
     print!(".intel_syntax noprefix\n");
     print!(".globl main\n");
     print!("main:\n");
@@ -13,8 +13,9 @@ pub fn gen(expr: Node) {
     print!("  push r14\n");
     print!("  push r15\n");
 
-    let top = gen_expr(expr, 0);
-    print!("  mov rax, {}\n", REG[top - 1]);
+    for stmt in program.nodes {
+        gen_stmt(stmt, 0);
+    }
 
     print!("  pop r12\n");
     print!("  pop r13\n");
@@ -24,6 +25,18 @@ pub fn gen(expr: Node) {
     print!("  ret\n");
 }
 
+fn gen_stmt(node: Node, top: usize) -> usize {
+    match node {
+        Node::ExprStmt(stmt) => {
+            let top = gen_expr(stmt.left, top) - 1;
+            print!("  mov rax, {}\n", REG[top]);
+            return top;
+        }
+        _ => {
+            unreachable!("must be statement\n");
+        }
+    }
+}
 fn gen_expr(expr: Node, top: usize) -> usize {
     match expr {
         Node::Number(i) => {
@@ -45,31 +58,32 @@ fn gen_expr(expr: Node, top: usize) -> usize {
                     print!("  cqo\n");
                     print!("  idiv {}\n", rs);
                     print!("  mov {}, rax\n", rs);
-                },
+                }
                 Operator::Eq => {
                     print!("  cmp {}, {}\n", rd, rs);
                     print!("  sete al\n");
                     print!("  movzb {}, al\n", rd);
-                },
+                }
                 Operator::Ne => {
                     print!("  cmp {}, {}\n", rd, rs);
                     print!("  setne al\n");
                     print!("  movzb {}, al\n", rd);
-                },
+                }
                 Operator::Lt => {
                     print!("# lt\n");
                     print!("  cmp {}, {}\n", rd, rs);
                     print!("  setl al\n");
                     print!("  movzb {}, al\n", rd);
-                },
+                }
                 Operator::Le => {
                     print!("# le\n");
                     print!("  cmp {}, {}\n", rd, rs);
                     print!("  setle al\n");
                     print!("  movzb {}, al\n", rd);
-                },
+                }
             }
             return top - 1;
         }
+        _ => top,
     }
 }

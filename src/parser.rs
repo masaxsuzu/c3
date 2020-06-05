@@ -3,22 +3,50 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{digit1, multispace0},
-    error::{ErrorKind},
+    error::ErrorKind,
     IResult,
 };
 
-use crate::ast::{Binary, Node, Operator};
+use crate::ast::{Binary, Node, Operator, Program, Unary};
 use crate::error::Error;
 
-pub fn parse(s: &str) -> Result<Node, Error> {
-    match expr(s) {
-        Ok((_,n)) => Ok(n),
-        Err(e) => {
-            return Err(Error::ParseError(e.to_string()));
+pub fn parse(s: &str) -> Result<Program, Error> {
+    let mut nodes = Vec::<Node>::new();
+    let mut x = s;
+    loop {
+        x = spaces(x);
+        if x == "" {
+            break;
+        }
+        match stmt(x) {
+            Ok((y, n)) => {
+                x = y;
+                nodes.push(n);
+            }
+            Err(e) => {
+                return Err(Error::ParseError(e.to_string()));
+            }
         }
     }
+    Ok(Program { nodes: nodes })
 }
 
+fn spaces(s: &str) -> &str {
+    if let Ok((x, _)) = multispace0::<&str, (&str, ErrorKind)>(s) {
+        return x;
+    }
+    s
+}
+
+// stmt = expr ";"
+fn stmt(s: &str) -> IResult<&str, Node> {
+    let (s, n) = expr(s)?;
+    let (s, _) = multispace0(s)?;
+    let (s, _) = tag(";")(s)?;
+    Ok((s, Node::ExprStmt(Box::new(Unary { left: n }))))
+}
+
+// expr = equality
 fn expr(s: &str) -> IResult<&str, Node> {
     equality(s)
 }
@@ -63,8 +91,24 @@ fn relational(s: &str) -> IResult<&str, Node> {
             match op {
                 "<=" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Le),
                 "<" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt),
-                ">=" => left = Node::Binary(Box::new(Binary {  left:right, right:left  }), Operator::Le),
-                ">" => left = Node::Binary(Box::new(Binary { left:right, right:left }), Operator::Lt),
+                ">=" => {
+                    left = Node::Binary(
+                        Box::new(Binary {
+                            left: right,
+                            right: left,
+                        }),
+                        Operator::Le,
+                    )
+                }
+                ">" => {
+                    left = Node::Binary(
+                        Box::new(Binary {
+                            left: right,
+                            right: left,
+                        }),
+                        Operator::Lt,
+                    )
+                }
                 _ => {}
             }
         } else {

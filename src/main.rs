@@ -10,11 +10,11 @@ fn main() {
         panic!("{}: invalid number of arguments", args[0]);
     }
 
-    std::process::exit( match parse(&args[1]) {
-        Ok(expr) => {
-            gen(expr);
+    std::process::exit(match parse(&args[1]) {
+        Ok(program) => {
+            gen(program);
             0
-        },
+        }
         Err(err) => {
             eprintln!("error: {:?}", err);
             1
