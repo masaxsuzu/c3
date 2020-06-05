@@ -80,7 +80,10 @@ fn unary(s: &str) -> IResult<&str, Node> {
     if let Ok((x, _)) = tag::<&str, &str, (&str, ErrorKind)>("-")(s) {
         let left = Node::Number(0);
         let (x, right) = unary(x)?;
-        return Ok((x, Node::Binary(Box::new(Binary { left, right }), Operator::Sub)));
+        return Ok((
+            x,
+            Node::Binary(Box::new(Binary { left, right }), Operator::Sub),
+        ));
     }
     primary(s)
 }

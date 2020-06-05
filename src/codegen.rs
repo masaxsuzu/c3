@@ -25,32 +25,29 @@ pub fn gen(expr: Node) {
 }
 
 fn gen_expr(expr: Node, top: usize) -> usize {
-    if let Node::Number(i) = expr {
-        print!("  mov {}, {}\n", REG[top], i);
-        return top + 1;
-    }
-
-    let x = if let Node::Binary(node, op) = expr {
-        let t = gen_expr(node.left, top);
-        let t = gen_expr(node.right, t);
-
-        let rd = REG[t - 2];
-        let rs = REG[t - 1];
-        match op {
-            Operator::Add => print!("  add {}, {}\n", rd, rs),
-            Operator::Sub => print!("  sub {}, {}\n", rd, rs),
-            Operator::Mul => print!("  imul {}, {}\n", rd, rs),
-            Operator::Div => {
-                print!("  mov rax, {}\n", rd);
-                print!("  cqo\n");
-                print!("  idiv {}\n", rs);
-                print!("  mov {}, rax\n", rs);
-            }
+    match expr {
+        Node::Number(i) => {
+            print!("  mov {}, {}\n", REG[top], i);
+            return top + 1;
         }
-        t - 1
-    } else {
-        top
-    };
+        Node::Binary(node, op) => {
+            let top = gen_expr(node.left, top);
+            let top = gen_expr(node.right, top);
 
-    return x;
+            let rd = REG[top - 2];
+            let rs = REG[top - 1];
+            match op {
+                Operator::Add => print!("  add {}, {}\n", rd, rs),
+                Operator::Sub => print!("  sub {}, {}\n", rd, rs),
+                Operator::Mul => print!("  imul {}, {}\n", rd, rs),
+                Operator::Div => {
+                    print!("  mov rax, {}\n", rd);
+                    print!("  cqo\n");
+                    print!("  idiv {}\n", rs);
+                    print!("  mov {}, rax\n", rs);
+                }
+            }
+            return top - 1;
+        }
+    }
 }
