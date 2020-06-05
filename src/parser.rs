@@ -68,9 +68,20 @@ fn stmt(p: Parser) -> Result<(Parser, Node), Error> {
     Ok((p, n))
 }
 
-// expr = equality
+// expr = assign
 fn expr(p: Parser) -> Result<(Parser, Node), Error> {
-    equality(p)
+    assign(p)
+}
+
+// assign = equality ("=" assign)?
+fn assign(p: Parser) -> Result<(Parser, Node), Error> {
+    let (p, mut left) = equality(p)?;
+    if let Ok((p1, _)) = tag(p.next(0), "=") {
+        let (p1, right) = assign(p1)?;
+        left = Node::Assign(Box::new(Binary { left, right }));
+        return Ok((p1, left));
+    }
+    Ok((p, left))
 }
 
 // equality = relational ("==" relational | "!=" relational)*
@@ -209,12 +220,15 @@ fn unary(p: Parser) -> Result<(Parser, Node), Error> {
     primary(p)
 }
 
-// primary = "(" expr ")" | num
+// primary = "(" expr ")" | ident | num
 fn primary(p: Parser) -> Result<(Parser, Node), Error> {
     if p.nth(0).is_reserved("(") {
         let (p, node) = expr(p)?;
         let (p, _) = tag(p, ";")?;
         return Ok((p, node));
+    }
+    if let Token::Identifier(x) = p.nth(0) {
+        return Ok((p.next(1), Node::Variable(x.to_string())));
     }
     num(p)
 }

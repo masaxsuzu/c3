@@ -6,7 +6,7 @@ pub struct Lexer<'a> {
     next_pos: usize,
     ch: u8,
     two_letter_keywords: [&'a str; 4],
-    one_letter_keywords: [&'a str; 9],
+    one_letter_keywords: [&'a str; 10],
 }
 
 impl<'a> Lexer<'a> {
@@ -17,7 +17,7 @@ impl<'a> Lexer<'a> {
             next_pos: 0,
             ch: 0,
             two_letter_keywords: ["==", "!=", "<=", ">="],
-            one_letter_keywords: ["+", "-", "*", "/", "=", "!", "<", ">", ";"],
+            one_letter_keywords: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "="],
         };
 
         lexer.read_char();
@@ -62,6 +62,12 @@ impl<'a> Lexer<'a> {
             return Token::Reserved("return");
         }
 
+        if let b'a'..=b'z' = self.ch {
+            let s = self.nth_str(1);
+            self.read_n(1);
+            return Token::Identifier(s);
+        }
+
         for p in self.two_letter_keywords.iter() {
             if self.starts_with(p) {
                 let token: Token<'a> = Token::Reserved(*p);
@@ -83,13 +89,7 @@ impl<'a> Lexer<'a> {
 
     fn starts_with(&self, word: &str) -> bool {
         let size = word.len();
-
-        let max = self.input.len();
-        let consumed = if self.pos + size < max {
-            &self.input[self.pos..self.pos + size]
-        } else {
-            &self.input[self.pos..max]
-        };
+        let consumed = self.nth_str(size);
         word == consumed
     }
 
@@ -136,6 +136,16 @@ impl<'a> Lexer<'a> {
         ch
     }
 
+    fn nth_str(&self, n: usize) -> &'a str {
+        let max = self.input.len();
+        let consumed = if self.pos + n < max {
+            &self.input[self.pos..self.pos + n]
+        } else {
+            &self.input[self.pos..max]
+        };
+        consumed
+    }
+
     fn skip_whitespace(&mut self) {
         loop {
             match self.ch {
@@ -152,7 +162,7 @@ impl<'a> Iterator for Lexer<'a> {
         match self.next_token() {
             Token::Eof => None,
             x => {
-                print!("# {:?}\n", x);
+                // print!("# {:?}\n", x);
                 Some(x)
             }
         }

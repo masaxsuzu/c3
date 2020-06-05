@@ -2,6 +2,8 @@
 pub enum Node {
     Program(Box<Program>),
     Number(i64),
+    Variable(String),
+    Assign(Box<Binary>),
     ExprStmt(Box<Unary>),
     Return(Box<Unary>),
     Binary(Box<Binary>, Operator),
