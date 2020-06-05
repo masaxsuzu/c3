@@ -45,7 +45,29 @@ fn gen_expr(expr: Node, top: usize) -> usize {
                     print!("  cqo\n");
                     print!("  idiv {}\n", rs);
                     print!("  mov {}, rax\n", rs);
-                }
+                },
+                Operator::Eq => {
+                    print!("  cmp {}, {}\n", rd, rs);
+                    print!("  sete al\n");
+                    print!("  movzb {}, al\n", rd);
+                },
+                Operator::Ne => {
+                    print!("  cmp {}, {}\n", rd, rs);
+                    print!("  setne al\n");
+                    print!("  movzb {}, al\n", rd);
+                },
+                Operator::Lt => {
+                    print!("# lt\n");
+                    print!("  cmp {}, {}\n", rd, rs);
+                    print!("  setl al\n");
+                    print!("  movzb {}, al\n", rd);
+                },
+                Operator::Le => {
+                    print!("# le\n");
+                    print!("  cmp {}, {}\n", rd, rs);
+                    print!("  setle al\n");
+                    print!("  movzb {}, al\n", rd);
+                },
             }
             return top - 1;
         }

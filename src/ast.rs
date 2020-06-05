@@ -10,6 +10,10 @@ pub enum Operator {
     Sub,
     Mul,
     Div,
+    Eq,
+    Ne,
+    Lt,
+    Le,
 }
 
 #[derive(Debug, Clone, PartialEq)]

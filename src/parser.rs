@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
-    ParseError,
+    ParseError(String),
 }
 
 extern crate nom;
@@ -15,15 +15,70 @@ use nom::{
 use crate::ast::{Binary, Node, Operator};
 
 pub fn parse(s: &str) -> Result<Node, Error> {
-    if let Ok((_, j)) = expr(s) {
-        Ok(j)
-    } else {
-        return Err(Error::ParseError);
+    match expr(s) {
+        Ok((_,n)) => Ok(n),
+        Err(e) => {
+            return Err(Error::ParseError(e.to_string()));
+        }
     }
 }
 
-// expr = mul ("+" mul | "-" mul)*
 fn expr(s: &str) -> IResult<&str, Node> {
+    equality(s)
+}
+
+// equality = relational ("==" relational | "!=" relational)*
+fn equality(s: &str) -> IResult<&str, Node> {
+    let (mut x, mut left) = relational(s)?;
+    loop {
+        let (y, _) = multispace0(x)?;
+        if let Ok((y, op)) = alt((
+            tag::<&str, &str, (&str, ErrorKind)>("=="),
+            tag::<&str, &str, (&str, ErrorKind)>("!="),
+        ))(y)
+        {
+            let (z, right) = relational(y)?;
+            x = z;
+            match op {
+                "==" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq),
+                "!=" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne),
+                _ => {}
+            }
+        } else {
+            return Ok((x, left));
+        }
+    }
+}
+
+// relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
+fn relational(s: &str) -> IResult<&str, Node> {
+    let (mut x, mut left) = add(s)?;
+    loop {
+        let (y, _) = multispace0(x)?;
+        if let Ok((y, op)) = alt((
+            tag::<&str, &str, (&str, ErrorKind)>("<="),
+            tag::<&str, &str, (&str, ErrorKind)>("<"),
+            tag::<&str, &str, (&str, ErrorKind)>(">="),
+            tag::<&str, &str, (&str, ErrorKind)>(">"),
+        ))(y)
+        {
+            let (z, right) = add(y)?;
+            x = z;
+            match op {
+                "<=" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Le),
+                "<" => left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt),
+                ">=" => left = Node::Binary(Box::new(Binary {  left:right, right:left  }), Operator::Le),
+                ">" => left = Node::Binary(Box::new(Binary { left:right, right:left }), Operator::Lt),
+                _ => {}
+            }
+        } else {
+            return Ok((x, left));
+        }
+    }
+}
+
+// add = mul ("+" mul | "-" mul)*
+fn add(s: &str) -> IResult<&str, Node> {
     let (mut x, mut left) = mul(s)?;
 
     loop {

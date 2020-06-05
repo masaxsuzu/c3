@@ -10,9 +10,12 @@ fn main() {
         panic!("{}: invalid number of arguments", args[0]);
     }
 
-    if let Ok(expr) = parse(&args[1]) {
-        gen(expr);
-    } else {
-        panic!("error");
+    match parse(&args[1]) {
+        Ok(expr) => {
+            gen(expr);
+        },
+        Err(e) => {
+            panic!("error: {:?}",e);
+        }
     }
 }
