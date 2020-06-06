@@ -84,11 +84,18 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        if let b'a'..=b'z' = self.ch {
-            let s = self.nth_str(1);
-            self.read_n(1);
-            return Token::Identifier(s);
-        }
+        let mut _x = Some(0);
+        while let Some(n) = _x {
+            if Self::is_alpha_num(self.nth_char(n)) {
+                _x = Some(n+1);
+            } else {
+                _x = None;
+                let name = self.nth_str(n);
+                let token = Token::Identifier::<'a>(name);
+                self.read_n(n);
+                return token
+            }
+        };
 
         self.read_n(1);
         Token::Illegal(start)
@@ -169,7 +176,7 @@ impl<'a> Iterator for Lexer<'a> {
         match self.next_token() {
             Token::Eof => None,
             x => {
-                // print!("# {:?}\n", x);
+                print!("# {:?}\n", x);
                 Some(x)
             }
         }
