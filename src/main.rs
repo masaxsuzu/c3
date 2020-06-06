@@ -1,7 +1,7 @@
 extern crate c3;
 use c3::codegen::gen;
 use c3::lexer::Lexer;
-use c3::parser::{parse, Parser};
+use c3::parser::{Parser, Tokens};
 use c3::token::Token;
 use std::env;
 use std::rc::Rc;
@@ -11,9 +11,9 @@ fn main() {
     if args.len() < 2 {
         panic!("{}: invalid number of arguments", args[0]);
     }
-    let x = Lexer::new(&args[1]).into_iter().collect::<Vec<Token>>();
-    let p = Parser::new(0, Rc::new(x));
-    std::process::exit(match parse(p) {
+    let tokens = Tokens::new(0, Rc::new(Lexer::new(&args[1]).into_iter().collect::<Vec<Token>>()));
+    let mut parser = Parser::new();
+    std::process::exit(match parser.parse(tokens) {
         Ok(program) => {
             gen(program);
             0

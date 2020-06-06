@@ -5,8 +5,9 @@ pub struct Lexer<'a> {
     pos: usize,
     next_pos: usize,
     ch: u8,
-    two_letter_keywords: [&'a str; 4],
-    one_letter_keywords: [&'a str; 10],
+    keywords: [&'a str; 1],
+    two_letter_punctuations: [&'a str; 4],
+    one_letter_punctuations: [&'a str; 10],
 }
 
 impl<'a> Lexer<'a> {
@@ -16,8 +17,9 @@ impl<'a> Lexer<'a> {
             pos: 0,
             next_pos: 0,
             ch: 0,
-            two_letter_keywords: ["==", "!=", "<=", ">="],
-            one_letter_keywords: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "="],
+            keywords: ["return"],
+            two_letter_punctuations: ["==", "!=", "<=", ">="],
+            one_letter_punctuations: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "="],
         };
 
         lexer.read_char();
@@ -28,9 +30,9 @@ impl<'a> Lexer<'a> {
     pub fn next_token(&mut self) -> Token<'a> {
         self.skip_whitespace();
         let token = match self.ch {
-            b'0'..=b'9' => return self.consume_number(),
             0 => Token::Eof,
-            _ => return self.consume_keyword(self.ch),
+            b'0'..=b'9' => self.consume_number(),
+            _ => self.consume_keyword(self.ch),
         };
 
         token
@@ -57,9 +59,30 @@ impl<'a> Lexer<'a> {
     }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
-        if self.starts_with("return") && !Self::is_alnum(self.nth_char(6)) {
-            self.read_n(6);
-            return Token::Reserved("return");
+
+        for keyword in self.keywords.iter() {
+            let n = keyword.len();
+            if self.starts_with(keyword) && !Self::is_alpha_num(self.nth_char(n)) {
+                let token: Token<'a> = Token::Reserved(*keyword);
+                self.read_n(n);
+                return token;
+            }
+        }
+
+        for p in self.two_letter_punctuations.iter() {
+            if self.starts_with(p) {
+                let token: Token<'a> = Token::Reserved(*p);
+                self.read_n(2);
+                return token;
+            }
+        }
+
+        for p in self.one_letter_punctuations.iter() {
+            if self.starts_with(p) {
+                let token = Token::Reserved::<'a>(*p);
+                self.read_n(1);
+                return token;
+            }
         }
 
         if let b'a'..=b'z' = self.ch {
@@ -68,22 +91,7 @@ impl<'a> Lexer<'a> {
             return Token::Identifier(s);
         }
 
-        for p in self.two_letter_keywords.iter() {
-            if self.starts_with(p) {
-                let token: Token<'a> = Token::Reserved(*p);
-                &self.read_char();
-                &self.read_char();
-                return token;
-            }
-        }
-        for p in self.one_letter_keywords.iter() {
-            if self.starts_with(p) {
-                let token = Token::Reserved::<'a>(*p);
-                &self.read_char();
-                return token;
-            }
-        }
-        &self.read_char();
+        self.read_n(1);
         Token::Illegal(start)
     }
 
@@ -119,7 +127,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn is_alnum(ch: u8) -> bool {
+    fn is_alpha_num(ch: u8) -> bool {
         match ch {
             b'0'..=b'9' => true,
             c => Self::is_alpha(c),

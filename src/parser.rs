@@ -5,247 +5,278 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Parser<'a> {
+pub struct Tokens<'a> {
     tokens: Rc<Vec<Token<'a>>>,
-    locals: Rc<RefCell<Vec<Variable>>>,
     pos: usize,
 }
 
-impl<'a> Parser<'a> {
+impl<'a> Tokens<'a> {
     pub fn new(pos: usize, input: Rc<Vec<Token<'a>>>) -> Self {
-        let p = Parser {
+        let p = Tokens {
             tokens: input,
             pos: pos,
-            locals: Rc::new(RefCell::new(Vec::new())),
         };
         p
     }
 
-    pub fn next(&self, n: usize) -> Self {
-        let mut p = Parser::new(self.pos + n, Rc::clone(&self.tokens));
-        p.locals = Rc::clone(&self.locals);
+    ///
+    /// Consume n tokens and create rest tokens. 
+    /// 
+    pub fn consume(&self, n: usize) -> Self {
+        let p = Tokens::new(self.pos + n, Rc::clone(&self.tokens));
         p
     }
 
-    pub fn nth(&self, n: usize) -> &Token {
+    ///
+    /// Peek n th token.
+    /// Get Eof if out of range.
+    /// 
+    pub fn peek(&self, n: usize) -> &Token {
         let i = self.pos + n;
         if i >= self.tokens.len() {
             return &Token::Eof;
         }
         return &self.tokens[self.pos + n];
     }
+
+    ///
+    /// Take the given reserved token.
+    /// 
+    pub fn take(&self, s: &str) -> Result<(Tokens<'a>, Node), Error> {
+        let t = self.peek(0);
+        if t.is_reserved(s) {
+            return Ok((self.consume(1), Node::Null));
+        }
+        Err(Error::ParseError(format!("{:?}: not {}", self.peek(0), s)))
+    }
 }
 
-pub fn parse(mut p: Parser) -> Result<Program, Error> {
-    let mut nodes = Vec::<Node>::new();
-    while p.nth(0) != &Token::Eof {
-        match stmt(p) {
-            Ok((p1, n)) => {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parser {
+    pub locals: Vec<Rc<RefCell<Variable>>>,
+}
+
+impl <'a> Parser {
+    pub fn new() -> Self {
+        Parser {
+            locals: Vec::new(),
+        }
+    }
+
+    fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
+        for var in self.locals.iter() {
+            if var.borrow_mut().name == name { 
+                return Some(var.clone());
+            }
+        }
+        None
+    }
+
+    pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program, Error> {
+        let mut nodes = Vec::<Node>::new();
+        while p.peek(0) != &Token::Eof {
+            match self.stmt(p) {
+                Ok((p1, n)) => {
+                    p = p1;
+                    nodes.push(n);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+        Ok(Program { nodes: nodes, locals: self.locals.clone(), stack_size:0 })
+    }
+
+    /// stmt = expr ";"
+    fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let (p, n) = if let Ok((p, _)) = p.consume(0).take("return") {
+            let (p, n) = self.expr(p)?;
+            (p, Node::Return(Box::new(Unary { left: n })))
+        } else {
+            let (p, n) = self.expr(p)?;
+            (p, Node::ExprStmt(Box::new(Unary { left: n })))
+        };
+        let (p, _) = p.take(";")?;
+        Ok((p, n))
+    }
+
+    /// expr = assign
+    fn expr(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        self.assign(p)
+    }
+
+    /// assign = equality ("=" assign)?
+    fn assign(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let (p, mut left) = self.equality(p)?;
+        if let Ok((p1, _)) = p.consume(0).take("=") {
+            let (p1, right) = self.assign(p1)?;
+            left = Node::Assign(Box::new(Binary { left, right }));
+            return Ok((p1, left));
+        }
+        Ok((p, left))
+    }
+
+    /// equality = relational ("==" relational | "!=" relational)*
+    fn equality(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let (mut p, mut left) = self.relational(p)?;
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take("==") {
+                let (p1, right) = self.relational(p1)?;
                 p = p1;
-                nodes.push(n);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq);
+                continue;
             }
-            Err(e) => {
-                return Err(e);
+            if let Ok((p2, _)) = p.consume(0).take("!=") {
+                let (p2, right) = self.relational(p2)?;
+                p = p2;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne);
+                continue;
             }
+            return Ok((p.consume(0), left));
         }
     }
-    Ok(Program { nodes: nodes })
-}
 
-fn tag<'a>(p: Parser<'a>, s: &str) -> Result<(Parser<'a>, Node), Error> {
-    let t = &p.nth(0);
-    if t.is_reserved(s) {
-        return Ok((p.next(1), Node::Null));
-    }
-    Err(Error::ParseError(format!("{:?}: not {}", p.nth(0), s)))
-}
-
-// stmt = expr ";"
-fn stmt(p: Parser) -> Result<(Parser, Node), Error> {
-    let (p, n) = if let Ok((p, _)) = tag(p.next(0), "return") {
-        let (p, n) = expr(p)?;
-        (p, Node::Return(Box::new(Unary { left: n })))
-    } else {
-        let (p, n) = expr(p)?;
-        (p, Node::ExprStmt(Box::new(Unary { left: n })))
-    };
-    let (p, _) = tag(p, ";")?;
-    Ok((p, n))
-}
-
-// expr = assign
-fn expr(p: Parser) -> Result<(Parser, Node), Error> {
-    assign(p)
-}
-
-// assign = equality ("=" assign)?
-fn assign(p: Parser) -> Result<(Parser, Node), Error> {
-    let (p, mut left) = equality(p)?;
-    if let Ok((p1, _)) = tag(p.next(0), "=") {
-        let (p1, right) = assign(p1)?;
-        left = Node::Assign(Box::new(Binary { left, right }));
-        return Ok((p1, left));
-    }
-    Ok((p, left))
-}
-
-// equality = relational ("==" relational | "!=" relational)*
-fn equality(p: Parser) -> Result<(Parser, Node), Error> {
-    let (mut p, mut left) = relational(p)?;
-    loop {
-        if let Ok((p1, _)) = tag(p.next(0), "==") {
-            let (p1, right) = relational(p1)?;
-            p = p1;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq);
-            continue;
+    /// relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
+    fn relational(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let (mut p, mut left) = self.add(p)?;
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take("<=") {
+                let (p1, right) = self.add(p1)?;
+                p = p1;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Le);
+                continue;
+            }
+            if let Ok((p2, _)) = p.consume(0).take("<") {
+                let (p2, right) = self.add(p2)?;
+                p = p2;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt);
+                continue;
+            }
+            if let Ok((p3, _)) = p.consume(0).take(">=") {
+                let (p3, right) = self.add(p3)?;
+                p = p3;
+                left = Node::Binary(
+                    Box::new(Binary {
+                        right: left,
+                        left: right,
+                    }),
+                    Operator::Le,
+                );
+                continue;
+            }
+            if let Ok((p4, _)) = p.consume(0).take(">") {
+                let (p4, right) = self.add(p4)?;
+                p = p4;
+                left = Node::Binary(
+                    Box::new(Binary {
+                        right: left,
+                        left: right,
+                    }),
+                    Operator::Lt,
+                );
+                continue;
+            }
+            return Ok((p.consume(0), left));
         }
-        if let Ok((p2, _)) = tag(p.next(0), "!=") {
-            let (p2, right) = relational(p2)?;
-            p = p2;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne);
-            continue;
-        }
-        return Ok((p.next(0), left));
     }
-}
 
-// relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
-fn relational(p: Parser) -> Result<(Parser, Node), Error> {
-    let (mut p, mut left) = add(p)?;
-    loop {
-        if let Ok((p1, _)) = tag(p.next(0), "<=") {
-            let (p1, right) = add(p1)?;
-            p = p1;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Le);
-            continue;
+    /// add = mul ("+" mul | "-" mul)*
+    fn add(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let (mut p, mut left) = self.mul(p)?;
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take("+") {
+                let (p1, right) = self.mul(p1)?;
+                p = p1;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Add);
+                continue;
+            }
+            if let Ok((p2, _)) = p.consume(0).take("-") {
+                let (p2, right) = self.mul(p2)?;
+                p = p2;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub);
+                continue;
+            }
+            return Ok((p.consume(0), left));
         }
-        if let Ok((p2, _)) = tag(p.next(0), "<") {
-            let (p2, right) = add(p2)?;
-            p = p2;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt);
-            continue;
-        }
-        if let Ok((p3, _)) = tag(p.next(0), ">=") {
-            let (p3, right) = add(p3)?;
-            p = p3;
-            left = Node::Binary(
-                Box::new(Binary {
-                    right: left,
-                    left: right,
-                }),
-                Operator::Le,
-            );
-            continue;
-        }
-        if let Ok((p4, _)) = tag(p.next(0), ">") {
-            let (p4, right) = add(p4)?;
-            p = p4;
-            left = Node::Binary(
-                Box::new(Binary {
-                    right: left,
-                    left: right,
-                }),
-                Operator::Lt,
-            );
-            continue;
-        }
-        return Ok((p.next(0), left));
     }
-}
 
-// add = mul ("+" mul | "-" mul)*
-fn add(p: Parser) -> Result<(Parser, Node), Error> {
-    let (mut p, mut left) = mul(p)?;
-    loop {
-        if let Ok((p1, _)) = tag(p.next(0), "+") {
-            let (p1, right) = mul(p1)?;
-            p = p1;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Add);
-            continue;
+    /// mul = unary ("*" unary | "/" unary)*
+    fn mul(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let (mut p, mut left) = self.unary(p)?;
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take("*") {
+                let (p1, right) = self.unary(p1)?;
+                p = p1;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul);
+                continue;
+            }
+            if let Ok((p2, _)) = p.consume(0).take("/") {
+                let (p2, right) = self.unary(p2)?;
+                p = p2;
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Div);
+                continue;
+            }
+            return Ok((p.consume(0), left));
         }
-        if let Ok((p2, _)) = tag(p.next(0), "-") {
-            let (p2, right) = mul(p2)?;
-            p = p2;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub);
-            continue;
+    }
+
+    /// unary = ("+" | "-") unary
+    ///       | primary
+    fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        if let Ok((p, _)) = p.consume(0).take("+") {
+            let (p, left) = self.unary(p)?;
+            return Ok((
+                p,
+                Node::Binary(
+                    Box::new(Binary {
+                        left,
+                        right: Node::Number(0),
+                    }),
+                    Operator::Add,
+                ),
+            ));
         }
-        return Ok((p.next(0), left));
-    }
-}
-
-// mul = unary ("*" unary | "/" unary)*
-fn mul(p: Parser) -> Result<(Parser, Node), Error> {
-    let (mut p, mut left) = unary(p)?;
-    loop {
-        if let Ok((p1, _)) = tag(p.next(0), "*") {
-            let (p1, right) = unary(p1)?;
-            p = p1;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul);
-            continue;
+        if let Ok((p, _)) = p.consume(0).take("-") {
+            let (p, right) = self.unary(p)?;
+            return Ok((
+                p,
+                Node::Binary(
+                    Box::new(Binary {
+                        left: Node::Number(0),
+                        right: right,
+                    }),
+                    Operator::Sub,
+                ),
+            ));
         }
-        if let Ok((p2, _)) = tag(p.next(0), "/") {
-            let (p2, right) = unary(p2)?;
-            p = p2;
-            left = Node::Binary(Box::new(Binary { left, right }), Operator::Div);
-            continue;
+        self.primary(p)
+    }
+
+    /// primary = "(" expr ")" | ident | num
+    fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        if let Ok((p, _)) = p.consume(0).take("(") {
+            let (p, node) = self.expr(p)?;
+            let (p, _) = p.take(";")?;
+            return Ok((p, node));
         }
-        return Ok((p.next(0), left));
+        if let Token::Identifier(x) = p.peek(0) {
+            let var = if let Some(v) = self.find_var(x) {
+                v
+            } else {
+                let v = Rc::new(RefCell::new(Variable { name: x.to_string(), offset:0}));
+                self.locals.push(v);
+                self.find_var(x).unwrap()
+            };
+            return Ok((p.consume(1), Node::Variable(var)));
+        }
+        self.num(p)
     }
-}
 
-// unary = ("+" | "-") unary
-//       | primary
-fn unary(p: Parser) -> Result<(Parser, Node), Error> {
-    if let Ok((p, _)) = tag(p.next(0), "+") {
-        let (p, left) = unary(p)?;
-        return Ok((
-            p,
-            Node::Binary(
-                Box::new(Binary {
-                    left,
-                    right: Node::Number(0),
-                }),
-                Operator::Add,
-            ),
-        ));
+    fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        if let Token::Number(i) = p.peek(0) {
+            return Ok((p.consume(1), Node::Number(*i)));
+        }
+        Err(Error::ParseError(format!("{:?}: not number", p.peek(0))))
     }
-    if let Ok((p, _)) = tag(p.next(0), "-") {
-        let (p, right) = unary(p)?;
-        return Ok((
-            p,
-            Node::Binary(
-                Box::new(Binary {
-                    left: Node::Number(0),
-                    right: right,
-                }),
-                Operator::Sub,
-            ),
-        ));
-    }
-    primary(p)
-}
-
-// primary = "(" expr ")" | ident | num
-fn primary(p: Parser) -> Result<(Parser, Node), Error> {
-    if p.nth(0).is_reserved("(") {
-        let (p, node) = expr(p)?;
-        let (p, _) = tag(p, ";")?;
-        return Ok((p, node));
-    }
-    if let Token::Identifier(x) = p.nth(0) {
-        return Ok((
-            p.next(1),
-            Node::Variable(Variable {
-                name: x.to_string(),
-            }),
-        ));
-    }
-    num(p)
-}
-
-fn num(p: Parser) -> Result<(Parser, Node), Error> {
-    if let Token::Number(i) = p.nth(0) {
-        return Ok((p.next(1), Node::Number(*i)));
-    }
-    Err(Error::ParseError(format!("{:?}: not number", p.nth(0))))
 }

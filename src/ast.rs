@@ -1,8 +1,11 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     Program(Box<Program>),
     Number(i64),
-    Variable(Variable),
+    Variable(Rc<RefCell<Variable>>),
     Assign(Box<Binary>),
     ExprStmt(Box<Unary>),
     Return(Box<Unary>),
@@ -25,11 +28,14 @@ pub enum Operator {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub nodes: Vec<Node>,
+    pub locals: Vec<Rc<RefCell<Variable>>>,
+    pub stack_size: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     pub name: String,
+    pub offset: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
