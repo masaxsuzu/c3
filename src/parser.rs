@@ -95,11 +95,12 @@ impl<'a> Parser {
     //      | "for" "(" expr? ";" expr? ";" expr ")" stmt
     //      | expr ";"
     fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
-        let (p, n) = if let Ok((p, _)) = p.consume(0).take("return") {
+        if let Ok((p, _)) = p.consume(0).take("return") {
             let (p, n) = self.expr(p)?;
             let (p, _) = p.take(";")?;
-            (p, Node::Return(Box::new(Unary { left: n })))
-        } else if let Ok((p, _)) = p.consume(0).take("if") {
+            return Ok((p, Node::Return(Box::new(Unary { left: n }))));
+        } 
+        if let Ok((p, _)) = p.consume(0).take("if") {
             let (p, _) = p.consume(0).take("(")?;
             let (p, cond) = self.expr(p)?;
             let (p, _) = p.consume(0).take(")")?;
@@ -109,15 +110,16 @@ impl<'a> Parser {
             } else {
                 (p, Node::Null)
             };
-            (
+            return Ok((
                 p,
                 Node::If(Box::new(If {
                     cond: cond,
                     then: then,
                     otherwise: otherwise,
                 })),
-            )
-        } else if let Ok((p, _)) = p.consume(0).take("for") {
+            ));
+        } 
+        if let Ok((p, _)) = p.consume(0).take("for") {
             let (p, _) = p.consume(0).take("(")?;
 
             let (p, init) = match self.expr(p.consume(0)) {
@@ -137,7 +139,7 @@ impl<'a> Parser {
             let (p, _) = p.consume(0).take(")")?;
             let (p, then) = self.stmt(p)?;
 
-            (
+            return Ok((
                 p,
                 Node::Loop(Box::new(For {
                     init,
@@ -145,13 +147,11 @@ impl<'a> Parser {
                     inc,
                     then,
                 })),
-            )
-        } else {
-            let (p, n) = self.expr(p)?;
-            let (p, _) = p.take(";")?;
-            (p, Node::ExprStmt(Box::new(Unary { left: n })))
-        };
-        Ok((p, n))
+            ));
+        } 
+        let (p, n) = self.expr(p)?;
+        let (p, _) = p.take(";")?;
+        Ok((p, Node::ExprStmt(Box::new(Unary { left: n }))))
     }
 
     /// expr = assign
