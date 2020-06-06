@@ -8,6 +8,8 @@ const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 pub fn gen(mut program: Program) {
     compute_offset(&mut program);
 
+    // eprintln!("{:?}\n",program);
+
     print!(".intel_syntax noprefix\n");
     print!(".globl main\n");
     print!("main:\n");
@@ -48,7 +50,29 @@ fn gen_stmt(node: &Node, top: usize) -> usize {
             print!("  mov rax, {}\n", REG[top]);
             print!("  jmp .L.return\n");
             return top;
-        }
+        },
+        Node::If(_if) => {
+            let top = if _if.otherwise != Node::Null {
+                let top = gen_expr(&_if.cond, top) - 1;
+                print!("  cmp %s, {}\n", REG[top]);
+                print!("  je  .L.else.{}\n",1);
+                let top = gen_stmt(&_if.then, top);
+                print!("  jmp .L.end.{}\n",1);
+                print!(".L.else.{}:\n",1);
+                let top = gen_stmt(&_if.otherwise, top);
+                print!(".L.end.{}:\n",1);
+                top
+
+            } else {
+                let top = gen_expr(&_if.cond, top) - 1;
+                print!("  cmp {}, 0\n", REG[top]);
+                print!("  je  .L.end.{}\n",1);
+                let top = gen_stmt(&_if.then, top);
+                print!(".L.end.{}:\n",1);
+                top
+            };
+            return top;
+        },
         _ => {
             unreachable!("must be statement\n");
         }

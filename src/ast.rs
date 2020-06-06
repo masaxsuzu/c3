@@ -9,6 +9,7 @@ pub enum Node {
     Assign(Box<Binary>),
     ExprStmt(Box<Unary>),
     Return(Box<Unary>),
+    If(Box<If>),
     Binary(Box<Binary>, Operator),
     Null,
 }
@@ -36,6 +37,13 @@ pub struct Program {
 pub struct Variable {
     pub name: String,
     pub offset: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct If {
+    pub cond: Node,
+    pub then: Node,
+    pub otherwise: Node,
 }
 
 #[derive(Debug, Clone, PartialEq)]

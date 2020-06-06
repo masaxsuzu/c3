@@ -1,4 +1,4 @@
-use crate::ast::{Binary, Node, Operator, Program, Unary, Variable};
+use crate::ast::{Binary, Node, Operator, Program, Unary, Variable, If};
 use crate::error::Error;
 use crate::token::Token;
 use std::cell::RefCell;
@@ -90,16 +90,30 @@ impl<'a> Parser {
         })
     }
 
-    /// stmt = expr ";"
+    // stmt = "return" expr ";"
+    //      | "if" "(" expr ")" stmt ("else" stmt)?
+    //      | expr ";"
     fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
         let (p, n) = if let Ok((p, _)) = p.consume(0).take("return") {
             let (p, n) = self.expr(p)?;
+            let (p, _) = p.take(";")?;
             (p, Node::Return(Box::new(Unary { left: n })))
+        } else if let Ok((p, _)) = p.consume(0).take("if") {
+            let (p, _) = p.consume(0).take("(")?;
+            let (p, cond) = self.expr(p)?;
+            let (p, _) = p.consume(0).take(")")?;
+            let (p, then) = self.stmt(p)?;
+            let (p, otherwise) = if let Ok((p, _)) = p.consume(0).take("else") {
+                self.stmt(p)?
+            } else {
+                (p, Node::Null)
+            };
+            (p, Node::If(Box::new( If { cond: cond, then: then, otherwise: otherwise})))
         } else {
             let (p, n) = self.expr(p)?;
+            let (p, _) = p.take(";")?;
             (p, Node::ExprStmt(Box::new(Unary { left: n })))
         };
-        let (p, _) = p.take(";")?;
         Ok((p, n))
     }
 

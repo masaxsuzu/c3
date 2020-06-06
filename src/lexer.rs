@@ -5,9 +5,9 @@ pub struct Lexer<'a> {
     pos: usize,
     next_pos: usize,
     ch: u8,
-    keywords: [&'a str; 1],
+    keywords: [&'a str; 3],
     two_letter_punctuations: [&'a str; 4],
-    one_letter_punctuations: [&'a str; 10],
+    one_letter_punctuations: [&'a str; 12],
 }
 
 impl<'a> Lexer<'a> {
@@ -17,9 +17,9 @@ impl<'a> Lexer<'a> {
             pos: 0,
             next_pos: 0,
             ch: 0,
-            keywords: ["return"],
+            keywords: ["return", "if", "else"],
             two_letter_punctuations: ["==", "!=", "<=", ">="],
-            one_letter_punctuations: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "="],
+            one_letter_punctuations: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "=", "(", ")"],
         };
 
         lexer.read_char();
@@ -88,7 +88,10 @@ impl<'a> Lexer<'a> {
         while let Some(n) = _x {
             if Self::is_alpha_num(self.nth_char(n)) {
                 _x = Some(n+1);
-            } else {
+            } else if n == 0 {
+                return Token::Eof;
+            }
+            else {
                 _x = None;
                 let name = self.nth_str(n);
                 let token = Token::Identifier::<'a>(name);
@@ -176,7 +179,7 @@ impl<'a> Iterator for Lexer<'a> {
         match self.next_token() {
             Token::Eof => None,
             x => {
-                print!("# {:?}\n", x);
+                // eprintln!("# {:?}\n", x);
                 Some(x)
             }
         }
