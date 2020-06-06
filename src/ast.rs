@@ -10,6 +10,7 @@ pub enum Node {
     ExprStmt(Box<Unary>),
     Return(Box<Unary>),
     If(Box<If>),
+    Loop(Box<For>),
     Binary(Box<Binary>, Operator),
     Null,
 }
@@ -44,6 +45,14 @@ pub struct If {
     pub cond: Node,
     pub then: Node,
     pub otherwise: Node,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct For {
+    pub init: Node,
+    pub cond: Node,
+    pub inc: Node,
+    pub then: Node,
 }
 
 #[derive(Debug, Clone, PartialEq)]

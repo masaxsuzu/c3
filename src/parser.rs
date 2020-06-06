@@ -1,4 +1,4 @@
-use crate::ast::{Binary, Node, Operator, Program, Unary, Variable, If};
+use crate::ast::{Binary, For, If, Node, Operator, Program, Unary, Variable};
 use crate::error::Error;
 use crate::token::Token;
 use std::cell::RefCell;
@@ -92,6 +92,7 @@ impl<'a> Parser {
 
     // stmt = "return" expr ";"
     //      | "if" "(" expr ")" stmt ("else" stmt)?
+    //      | "for" "(" expr? ";" expr? ";" expr ")" stmt
     //      | expr ";"
     fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
         let (p, n) = if let Ok((p, _)) = p.consume(0).take("return") {
@@ -108,7 +109,43 @@ impl<'a> Parser {
             } else {
                 (p, Node::Null)
             };
-            (p, Node::If(Box::new( If { cond: cond, then: then, otherwise: otherwise})))
+            (
+                p,
+                Node::If(Box::new(If {
+                    cond: cond,
+                    then: then,
+                    otherwise: otherwise,
+                })),
+            )
+        } else if let Ok((p, _)) = p.consume(0).take("for") {
+            let (p, _) = p.consume(0).take("(")?;
+
+            let (p, init) = match self.expr(p.consume(0)) {
+                Ok((p, expr)) => (p, Node::ExprStmt(Box::new(Unary { left: expr }))),
+                _ => (p, Node::Null),
+            };
+            let (p, _) = p.consume(0).take(";")?;
+            let (p, cond) = match self.expr(p.consume(0)) {
+                Ok((p, expr)) => (p, expr),
+                _ => (p, Node::Null),
+            };
+            let (p, _) = p.consume(0).take(";")?;
+            let (p, inc) = match self.expr(p.consume(0)) {
+                Ok((p, expr)) => (p, Node::ExprStmt(Box::new(Unary { left: expr }))),
+                _ => (p, Node::Null),
+            };
+            let (p, _) = p.consume(0).take(")")?;
+            let (p, then) = self.stmt(p)?;
+
+            (
+                p,
+                Node::Loop(Box::new(For {
+                    init,
+                    cond,
+                    inc,
+                    then,
+                })),
+            )
         } else {
             let (p, n) = self.expr(p)?;
             let (p, _) = p.take(";")?;

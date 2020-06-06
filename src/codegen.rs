@@ -24,6 +24,7 @@ pub fn gen(mut program: Program) {
     print!("  mov [rbp-32], r15\n");
 
     for stmt in &program.nodes {
+        // eprintln!("{:?}\n", stmt);
         gen_stmt(&stmt, 0);
     }
 
@@ -50,31 +51,61 @@ fn gen_stmt(node: &Node, top: usize) -> usize {
             print!("  mov rax, {}\n", REG[top]);
             print!("  jmp .L.return\n");
             return top;
-        },
+        }
         Node::If(_if) => {
             let top = if _if.otherwise != Node::Null {
                 let top = gen_expr(&_if.cond, top) - 1;
                 print!("  cmp %s, {}\n", REG[top]);
-                print!("  je  .L.else.{}\n",1);
+                print!("  je  .L.else.{}\n", 1);
                 let top = gen_stmt(&_if.then, top);
-                print!("  jmp .L.end.{}\n",1);
-                print!(".L.else.{}:\n",1);
+                print!("  jmp .L.end.{}\n", 1);
+                print!(".L.else.{}:\n", 1);
                 let top = gen_stmt(&_if.otherwise, top);
-                print!(".L.end.{}:\n",1);
+                print!(".L.end.{}:\n", 1);
                 top
-
             } else {
                 let top = gen_expr(&_if.cond, top) - 1;
                 print!("  cmp {}, 0\n", REG[top]);
-                print!("  je  .L.end.{}\n",1);
+                print!("  je  .L.end.{}\n", 1);
                 let top = gen_stmt(&_if.then, top);
-                print!(".L.end.{}:\n",1);
+                print!(".L.end.{}:\n", 1);
                 top
             };
             return top;
-        },
+        }
+        Node::Loop(_for) => {
+            let top = if _for.init != Node::Null {
+                gen_stmt(&_for.init, top)
+            } else {
+                top
+            };
+
+            print!(".L.begin.{}:\n", 1);
+
+            let top = if _for.cond != Node::Null {
+                let top = gen_expr(&_for.cond, top) - 1;
+                print!("  cmp {}, 0\n", REG[top]);
+                print!("  je  .L.end.{}\n", 1);
+                top
+            } else {
+                top
+            };
+
+            let top = gen_stmt(&_for.then, top);
+
+            let top = if _for.inc != Node::Null {
+                gen_stmt(&_for.inc, top)
+            } else {
+                top
+            };
+
+            print!("  jmp  .L.begin.{}\n", 1);
+            print!(".L.end.{}:\n", 1);
+
+            return top;
+        }
         _ => {
-            unreachable!("must be statement\n");
+            unreachable!("must be statement {:?} \n", node);
         }
     }
 }

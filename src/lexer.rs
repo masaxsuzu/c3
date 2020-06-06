@@ -5,7 +5,7 @@ pub struct Lexer<'a> {
     pos: usize,
     next_pos: usize,
     ch: u8,
-    keywords: [&'a str; 3],
+    keywords: [&'a str; 4],
     two_letter_punctuations: [&'a str; 4],
     one_letter_punctuations: [&'a str; 12],
 }
@@ -17,7 +17,7 @@ impl<'a> Lexer<'a> {
             pos: 0,
             next_pos: 0,
             ch: 0,
-            keywords: ["return", "if", "else"],
+            keywords: ["return", "if", "else", "for"],
             two_letter_punctuations: ["==", "!=", "<=", ">="],
             one_letter_punctuations: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "=", "(", ")"],
         };
@@ -87,18 +87,17 @@ impl<'a> Lexer<'a> {
         let mut _x = Some(0);
         while let Some(n) = _x {
             if Self::is_alpha_num(self.nth_char(n)) {
-                _x = Some(n+1);
+                _x = Some(n + 1);
             } else if n == 0 {
                 return Token::Eof;
-            }
-            else {
+            } else {
                 _x = None;
                 let name = self.nth_str(n);
                 let token = Token::Identifier::<'a>(name);
                 self.read_n(n);
-                return token
+                return token;
             }
-        };
+        }
 
         self.read_n(1);
         Token::Illegal(start)
