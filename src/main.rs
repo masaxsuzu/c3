@@ -1,5 +1,5 @@
 extern crate c3;
-use c3::codegen::gen;
+use c3::codegen::{CodeGenerator};
 use c3::lexer::Lexer;
 use c3::parser::{Parser, Tokens};
 use c3::token::Token;
@@ -16,9 +16,10 @@ fn main() {
         Rc::new(Lexer::new(&args[1]).into_iter().collect::<Vec<Token>>()),
     );
     let mut parser = Parser::new();
+    let mut codegen = CodeGenerator::new();
     std::process::exit(match parser.parse(tokens) {
         Ok(program) => {
-            gen(program);
+            codegen.gen(program);
             0
         }
         Err(err) => {
