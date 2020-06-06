@@ -11,7 +11,10 @@ fn main() {
     if args.len() < 2 {
         panic!("{}: invalid number of arguments", args[0]);
     }
-    let tokens = Tokens::new(0, Rc::new(Lexer::new(&args[1]).into_iter().collect::<Vec<Token>>()));
+    let tokens = Tokens::new(
+        0,
+        Rc::new(Lexer::new(&args[1]).into_iter().collect::<Vec<Token>>()),
+    );
     let mut parser = Parser::new();
     std::process::exit(match parser.parse(tokens) {
         Ok(program) => {

@@ -59,7 +59,6 @@ impl<'a> Lexer<'a> {
     }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
-
         for keyword in self.keywords.iter() {
             let n = keyword.len();
             if self.starts_with(keyword) && !Self::is_alpha_num(self.nth_char(n)) {

@@ -20,8 +20,8 @@ impl<'a> Tokens<'a> {
     }
 
     ///
-    /// Consume n tokens and create rest tokens. 
-    /// 
+    /// Consume n tokens and create rest tokens.
+    ///
     pub fn consume(&self, n: usize) -> Self {
         let p = Tokens::new(self.pos + n, Rc::clone(&self.tokens));
         p
@@ -30,7 +30,7 @@ impl<'a> Tokens<'a> {
     ///
     /// Peek n th token.
     /// Get Eof if out of range.
-    /// 
+    ///
     pub fn peek(&self, n: usize) -> &Token {
         let i = self.pos + n;
         if i >= self.tokens.len() {
@@ -41,7 +41,7 @@ impl<'a> Tokens<'a> {
 
     ///
     /// Take the given reserved token.
-    /// 
+    ///
     pub fn take(&self, s: &str) -> Result<(Tokens<'a>, Node), Error> {
         let t = self.peek(0);
         if t.is_reserved(s) {
@@ -56,16 +56,14 @@ pub struct Parser {
     pub locals: Vec<Rc<RefCell<Variable>>>,
 }
 
-impl <'a> Parser {
+impl<'a> Parser {
     pub fn new() -> Self {
-        Parser {
-            locals: Vec::new(),
-        }
+        Parser { locals: Vec::new() }
     }
 
     fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
         for var in self.locals.iter() {
-            if var.borrow_mut().name == name { 
+            if var.borrow_mut().name == name {
                 return Some(var.clone());
             }
         }
@@ -85,7 +83,11 @@ impl <'a> Parser {
                 }
             }
         }
-        Ok(Program { nodes: nodes, locals: self.locals.clone(), stack_size:0 })
+        Ok(Program {
+            nodes: nodes,
+            locals: self.locals.clone(),
+            stack_size: 0,
+        })
     }
 
     /// stmt = expr ";"
@@ -264,7 +266,10 @@ impl <'a> Parser {
             let var = if let Some(v) = self.find_var(x) {
                 v
             } else {
-                let v = Rc::new(RefCell::new(Variable { name: x.to_string(), offset:0}));
+                let v = Rc::new(RefCell::new(Variable {
+                    name: x.to_string(),
+                    offset: 0,
+                }));
                 self.locals.push(v);
                 self.find_var(x).unwrap()
             };
