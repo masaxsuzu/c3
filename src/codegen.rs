@@ -46,7 +46,7 @@ fn gen_stmt(node: &Node, top: usize) -> usize {
         Node::Return(expr) => {
             let top = gen_expr(&expr.left, top) - 1;
             print!("  mov rax, {}\n", REG[top]);
-            print!("  jmp .L.return\n\n");
+            print!("  jmp .L.return\n");
             return top;
         }
         _ => {
