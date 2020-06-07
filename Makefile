@@ -1,7 +1,9 @@
 c3:
+	cargo build --release
+	bash ./test.sh release
+
+debug:
 	cargo build
+	bash ./test.sh debug
 
-test: c3
-	bash ./test.sh
-
-.PHONY: test c3 dev
+.PHONY: c3 debug

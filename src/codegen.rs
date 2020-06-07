@@ -32,7 +32,9 @@ impl CodeGenerator {
         print!("  mov [rbp-24], r14\n");
         print!("  mov [rbp-32], r15\n");
 
-        // eprintln!("{:?}", program.stmt);
+        #[cfg(debug_assertions)]
+        eprintln!("{:?}", program.stmt);
+        
         self.gen_stmt(&program.stmt, 0);
 
         // Epilogue

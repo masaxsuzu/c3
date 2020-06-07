@@ -180,7 +180,8 @@ impl<'a> Iterator for Lexer<'a> {
         match self.next_token() {
             Token::Eof => None,
             x => {
-                // eprintln!("{:?}\n", x);
+                #[cfg(debug_assertions)]
+                eprintln!("{:?}", x);
                 Some(x)
             }
         }
