@@ -1,19 +1,21 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::token::Token;
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Node {
-    Program(Box<Program>),
-    Number(i64),
-    Variable(Rc<RefCell<Variable>>),
-    Assign(Box<Binary>),
-    ExprStmt(Box<Unary>),
-    BlockStmt(Box<Block>),
-    Return(Box<Unary>),
-    If(Box<If>),
-    Loop(Box<For>),
-    Binary(Box<Binary>, Operator),
-    Null,
+pub enum Node<'a> {
+    Program(Box<Program<'a>>, Token<'a>),
+    Number(i64, Token<'a>),
+    Variable(Rc<RefCell<Variable>>, Token<'a>),
+    Assign(Box<Binary<'a>>, Token<'a>),
+    ExprStmt(Box<Unary<'a>>, Token<'a>),
+    BlockStmt(Box<Block<'a>>, Token<'a>),
+    Return(Box<Unary<'a>>, Token<'a>),
+    If(Box<If<'a>>, Token<'a>),
+    Loop(Box<For<'a>>, Token<'a>),
+    Binary(Box<Binary<'a>>, Operator, Token<'a>),
+    Null(Token<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,8 +31,8 @@ pub enum Operator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program {
-    pub stmt: Node,
+pub struct Program<'a> {
+    pub stmt: Node<'a>,
     pub locals: Vec<Rc<RefCell<Variable>>>,
     pub stack_size: i64,
 }
@@ -42,32 +44,32 @@ pub struct Variable {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Block {
-    pub nodes: Vec<Node>,
+pub struct Block<'a> {
+    pub nodes: Vec<Node<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct If {
-    pub cond: Node,
-    pub then: Node,
-    pub otherwise: Node,
+pub struct If<'a> {
+    pub cond: Node<'a>,
+    pub then: Node<'a>,
+    pub otherwise: Node<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct For {
-    pub init: Node,
-    pub cond: Node,
-    pub inc: Node,
-    pub then: Node,
+pub struct For<'a> {
+    pub init: Node<'a>,
+    pub cond: Node<'a>,
+    pub inc: Node<'a>,
+    pub then: Node<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Unary {
-    pub left: Node,
+pub struct Unary<'a> {
+    pub left: Node<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Binary {
-    pub left: Node,
-    pub right: Node,
+pub struct Binary<'a> {
+    pub left: Node<'a>,
+    pub right: Node<'a>,
 }

@@ -31,7 +31,7 @@ impl<'a> Tokens<'a> {
     /// Peek n th token.
     /// Get Eof if out of range.
     ///
-    pub fn peek(&self, n: usize) -> &Token {
+    pub fn peek(&self, n: usize) -> &Token<'a> {
         let i = self.pos + n;
         if i >= self.tokens.len() {
             return &Token::Eof(0);  // dummy pos.
@@ -42,10 +42,10 @@ impl<'a> Tokens<'a> {
     ///
     /// Take the given reserved token.
     ///
-    pub fn take(&self, s: &str) -> Result<(Tokens<'a>, Node), Error> {
-        let t = self.peek(0);
+    pub fn take(&self, s: &str) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = self.peek(0).clone();
         if t.is_reserved(s) {
-            return Ok((self.consume(1), Node::Null));
+            return Ok((self.consume(1), Node::Null(t)));
         }
         Err(Error::ParseError(format!("{:?}: not {}", self.peek(0), s)))
     }
@@ -70,7 +70,7 @@ impl<'a> Parser {
         None
     }
 
-    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program, Error> {
+    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error> {
         let (_, n) = self.stmt(p)?;
 
         Ok(Program {
@@ -86,13 +86,16 @@ impl<'a> Parser {
     //      | "while" "(" expr ")" stmt
     //      | "{" compound-stmt
     //      | expr ";"
-    fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         if let Ok((p, _)) = p.consume(0).take("return") {
+            let t = p.peek(0).clone();
             let (p, n) = self.expr(p)?;
             let (p, _) = p.take(";")?;
-            return Ok((p, Node::Return(Box::new(Unary { left: n }))));
+            return Ok((p, Node::Return(Box::new(Unary { left: n }), t.clone())));
         }
         if let Ok((p, _)) = p.consume(0).take("if") {
+            let t = p.peek(0).clone();
             let (p, _) = p.consume(0).take("(")?;
             let (p, cond) = self.expr(p)?;
             let (p, _) = p.consume(0).take(")")?;
@@ -100,7 +103,7 @@ impl<'a> Parser {
             let (p, otherwise) = if let Ok((p, _)) = p.consume(0).take("else") {
                 self.stmt(p)?
             } else {
-                (p, Node::Null)
+                (p, Node::Null(t.clone()))
             };
             return Ok((
                 p,
@@ -108,25 +111,25 @@ impl<'a> Parser {
                     cond: cond,
                     then: then,
                     otherwise: otherwise,
-                })),
+                }),
+                t.clone()),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("for") {
             let (p, _) = p.consume(0).take("(")?;
-
             let (p, init) = match self.expr(p.consume(0)) {
-                Ok((p, expr)) => (p, Node::ExprStmt(Box::new(Unary { left: expr }))),
-                _ => (p, Node::Null),
+                Ok((p, expr)) => (p, Node::ExprStmt(Box::new(Unary { left: expr }), t.clone())),
+                _ => (p, Node::Null(t.clone())),
             };
             let (p, _) = p.consume(0).take(";")?;
             let (p, cond) = match self.expr(p.consume(0)) {
                 Ok((p, expr)) => (p, expr),
-                _ => (p, Node::Null),
+                _ => (p, Node::Null(t.clone())),
             };
             let (p, _) = p.consume(0).take(";")?;
             let (p, inc) = match self.expr(p.consume(0)) {
-                Ok((p, expr)) => (p, Node::ExprStmt(Box::new(Unary { left: expr }))),
-                _ => (p, Node::Null),
+                Ok((p, expr)) => (p, Node::ExprStmt(Box::new(Unary { left: expr }), t.clone())),
+                _ => (p, Node::Null(t.clone())),
             };
             let (p, _) = p.consume(0).take(")")?;
             let (p, then) = self.stmt(p)?;
@@ -138,7 +141,8 @@ impl<'a> Parser {
                     cond,
                     inc,
                     then,
-                })),
+                }),
+                t.clone()),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("while") {
@@ -149,25 +153,28 @@ impl<'a> Parser {
             return Ok((
                 p,
                 Node::Loop(Box::new(For {
-                    init: Node::Null,
+                    init: Node::Null(t.clone()),
                     cond: cond,
                     then: then,
-                    inc: Node::Null,
-                })),
+                    inc: Node::Null(t.clone()),
+                }),
+                t.clone()),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("{") {
             return self.compound_stmt(p);
         }
 
+        let t = p.peek(0).clone();
         let (p, n) = self.expr(p)?;
         let (p, _) = p.take(";")?;
-        Ok((p, Node::ExprStmt(Box::new(Unary { left: n }))))
+        Ok((p, Node::ExprStmt(Box::new(Unary { left: n }),t)))
     }
 
     // compound-stmt = stmt* "}"
-    fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
         let mut nodes = Vec::new();
+        let t = p.peek(0).clone();
         loop {
             if let Ok((p1, _)) = p.consume(0).take("}") {
                 p = p1;
@@ -178,39 +185,41 @@ impl<'a> Parser {
             nodes.push(n);
         }
 
-        Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }))))
+        Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }),t)))
     }
 
     /// expr = assign
-    fn expr(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn expr(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
         self.assign(p)
     }
 
     /// assign = equality ("=" assign)?
-    fn assign(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn assign(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         let (p, mut left) = self.equality(p)?;
         if let Ok((p1, _)) = p.consume(0).take("=") {
             let (p1, right) = self.assign(p1)?;
-            left = Node::Assign(Box::new(Binary { left, right }));
+            left = Node::Assign(Box::new(Binary { left, right }),t);
             return Ok((p1, left));
         }
         Ok((p, left))
     }
 
     /// equality = relational ("==" relational | "!=" relational)*
-    fn equality(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn equality(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         let (mut p, mut left) = self.relational(p)?;
         loop {
             if let Ok((p1, _)) = p.consume(0).take("==") {
                 let (p1, right) = self.relational(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("!=") {
                 let (p2, right) = self.relational(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne, t.clone());
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -218,19 +227,20 @@ impl<'a> Parser {
     }
 
     /// relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
-    fn relational(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn relational(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         let (mut p, mut left) = self.add(p)?;
         loop {
             if let Ok((p1, _)) = p.consume(0).take("<=") {
                 let (p1, right) = self.add(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Le);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Le, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("<") {
                 let (p2, right) = self.add(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt, t.clone());
                 continue;
             }
             if let Ok((p3, _)) = p.consume(0).take(">=") {
@@ -242,10 +252,12 @@ impl<'a> Parser {
                         left: right,
                     }),
                     Operator::Le,
+                    t.clone()
                 );
                 continue;
             }
             if let Ok((p4, _)) = p.consume(0).take(">") {
+                let t = p.peek(0).clone();
                 let (p4, right) = self.add(p4)?;
                 p = p4;
                 left = Node::Binary(
@@ -254,6 +266,7 @@ impl<'a> Parser {
                         left: right,
                     }),
                     Operator::Lt,
+                    t.clone()
                 );
                 continue;
             }
@@ -262,19 +275,20 @@ impl<'a> Parser {
     }
 
     /// add = mul ("+" mul | "-" mul)*
-    fn add(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn add(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         let (mut p, mut left) = self.mul(p)?;
         loop {
             if let Ok((p1, _)) = p.consume(0).take("+") {
                 let (p1, right) = self.mul(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Add);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Add, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("-") {
                 let (p2, right) = self.mul(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub, t.clone());
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -282,19 +296,20 @@ impl<'a> Parser {
     }
 
     /// mul = unary ("*" unary | "/" unary)*
-    fn mul(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn mul(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         let (mut p, mut left) = self.unary(p)?;
         loop {
             if let Ok((p1, _)) = p.consume(0).take("*") {
                 let (p1, right) = self.unary(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("/") {
                 let (p2, right) = self.unary(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Div);
+                left = Node::Binary(Box::new(Binary { left, right }), Operator::Div, t.clone());
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -303,7 +318,8 @@ impl<'a> Parser {
 
     /// unary = ("+" | "-") unary
     ///       | primary
-    fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0);
         if let Ok((p, _)) = p.consume(0).take("+") {
             let (p, left) = self.unary(p)?;
             return Ok((
@@ -311,9 +327,10 @@ impl<'a> Parser {
                 Node::Binary(
                     Box::new(Binary {
                         left,
-                        right: Node::Number(0),
+                        right: Node::Number(0,t.clone()),
                     }),
                     Operator::Add,
+                    t.clone()
                 ),
             ));
         }
@@ -323,10 +340,11 @@ impl<'a> Parser {
                 p,
                 Node::Binary(
                     Box::new(Binary {
-                        left: Node::Number(0),
+                        left: Node::Number(0, t.clone()),
                         right: right,
                     }),
                     Operator::Sub,
+                    t.clone()
                 ),
             ));
         }
@@ -334,7 +352,8 @@ impl<'a> Parser {
     }
 
     /// primary = "(" expr ")" | ident | num
-    fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         if let Ok((p, _)) = p.consume(0).take("(") {
             let (p, node) = self.expr(p)?;
             let (p, _) = p.take(";")?;
@@ -351,14 +370,15 @@ impl<'a> Parser {
                 self.locals.push(v);
                 self.find_var(x).unwrap()
             };
-            return Ok((p.consume(1), Node::Variable(var)));
+            return Ok((p.consume(1), Node::Variable(var, t)));
         }
         self.num(p)
     }
 
-    fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+    fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+        let t = p.peek(0).clone();
         if let Token::Number(i,_) = p.peek(0) {
-            return Ok((p.consume(1), Node::Number(*i)));
+            return Ok((p.consume(1), Node::Number(*i, t)));
         }
         Err(Error::ParseError(format!("{:?}: not number", p.peek(0))))
     }

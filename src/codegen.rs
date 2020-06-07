@@ -51,27 +51,27 @@ impl CodeGenerator {
 
     fn gen_stmt(&mut self, node: &Node, mut top: usize) -> usize {
         match node {
-            Node::BlockStmt(block) => {
+            Node::BlockStmt(block, _) => {
                 for stmt in block.nodes.iter() {
                     top = self.gen_stmt(stmt, top);
                 }
                 return top;
             }
-            Node::ExprStmt(stmt) => {
+            Node::ExprStmt(stmt, _) => {
                 let top = self.gen_expr(&stmt.left, top) - 1;
                 return top;
             }
-            Node::Return(expr) => {
+            Node::Return(expr, _) => {
                 let top = self.gen_expr(&expr.left, top) - 1;
                 print!("  mov rax, {}\n", REG[top]);
                 print!("  jmp .L.return\n");
                 return top;
             }
-            Node::If(_if) => {
+            Node::If(_if, _) => {
                 self.label_seq += 1;
                 let seq = self.label_seq;
 
-                let top = if _if.otherwise != Node::Null {
+                let top = if !is_null(&_if.otherwise) {
                     let top = self.gen_expr(&_if.cond, top) - 1;
                     print!("  cmp %s, {}\n", REG[top]);
                     print!("  je  .L.else.{}\n", seq);
@@ -91,11 +91,11 @@ impl CodeGenerator {
                 };
                 return top;
             }
-            Node::Loop(_for) => {
+            Node::Loop(_for, _) => {
                 self.label_seq += 1;
                 let seq = self.label_seq;
 
-                let top = if _for.init != Node::Null {
+                let top = if !is_null(&_for.init) {
                     self.gen_stmt(&_for.init, top)
                 } else {
                     top
@@ -103,7 +103,7 @@ impl CodeGenerator {
 
                 print!(".L.begin.{}:\n", seq);
 
-                let top = if _for.cond != Node::Null {
+                let top = if !is_null(&_for.cond) {
                     let top = self.gen_expr(&_for.cond, top) - 1;
                     print!("  cmp {}, 0\n", REG[top]);
                     print!("  je  .L.end.{}\n", seq);
@@ -114,7 +114,7 @@ impl CodeGenerator {
 
                 let top = self.gen_stmt(&_for.then, top);
 
-                let top = if _for.inc != Node::Null {
+                let top = if !is_null(&_for.inc) {
                     self.gen_stmt(&_for.inc, top)
                 } else {
                     top
@@ -125,7 +125,7 @@ impl CodeGenerator {
 
                 return top;
             }
-            Node::Null => {
+            Node::Null(_) => {
                 return top;
             }
             _ => {
@@ -136,20 +136,20 @@ impl CodeGenerator {
 
     fn gen_expr(&self, expr: &Node, top: usize) -> usize {
         match expr {
-            Node::Number(i) => {
+            Node::Number(i, _) => {
                 print!("  mov {}, {}\n", REG[top], i);
                 return top + 1;
             }
-            Node::Variable(var) => {
+            Node::Variable(var, _) => {
                 let top = self.gen_addr_var(var, top);
                 return load(top);
             }
-            Node::Assign(node) => {
+            Node::Assign(node, _) => {
                 let top = self.gen_expr(&node.right, top);
                 let top = self.gen_addr(&node.left, top);
                 return store(top);
             }
-            Node::Binary(node, op) => {
+            Node::Binary(node, op, _) => {
                 let top = self.gen_expr(&node.left, top);
                 let top = self.gen_expr(&node.right, top);
 
@@ -193,7 +193,7 @@ impl CodeGenerator {
     }
 
     fn gen_addr(&self, node: &Node, top: usize) -> usize {
-        if let Node::Variable(var) = node {
+        if let Node::Variable(var, _) = node {
             return self.gen_addr_var(var, top);
         }
         return top;
@@ -223,4 +223,11 @@ fn load(top: usize) -> usize {
 fn store(top: usize) -> usize {
     print!("  mov [{}], {}\n", REG[top - 1], REG[top - 2]);
     top - 1
+}
+
+fn is_null(node : &Node) ->bool {
+    match node {
+        Node::Null(_) => true,
+        _ => false,
+    }
 }
