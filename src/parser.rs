@@ -34,7 +34,7 @@ impl<'a> Tokens<'a> {
     pub fn peek(&self, n: usize) -> &Token<'a> {
         let i = self.pos + n;
         if i >= self.tokens.len() {
-            return &Token::Eof(0);  // dummy pos.
+            return &Token::Eof(0); // dummy pos.
         }
         return &self.tokens[self.pos + n];
     }
@@ -107,12 +107,14 @@ impl<'a> Parser {
             };
             return Ok((
                 p,
-                Node::If(Box::new(If {
-                    cond: cond,
-                    then: then,
-                    otherwise: otherwise,
-                }),
-                t.clone()),
+                Node::If(
+                    Box::new(If {
+                        cond: cond,
+                        then: then,
+                        otherwise: otherwise,
+                    }),
+                    t.clone(),
+                ),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("for") {
@@ -136,13 +138,15 @@ impl<'a> Parser {
 
             return Ok((
                 p,
-                Node::Loop(Box::new(For {
-                    init,
-                    cond,
-                    inc,
-                    then,
-                }),
-                t.clone()),
+                Node::Loop(
+                    Box::new(For {
+                        init,
+                        cond,
+                        inc,
+                        then,
+                    }),
+                    t.clone(),
+                ),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("while") {
@@ -152,13 +156,15 @@ impl<'a> Parser {
             let (p, then) = self.stmt(p)?;
             return Ok((
                 p,
-                Node::Loop(Box::new(For {
-                    init: Node::Null(t.clone()),
-                    cond: cond,
-                    then: then,
-                    inc: Node::Null(t.clone()),
-                }),
-                t.clone()),
+                Node::Loop(
+                    Box::new(For {
+                        init: Node::Null(t.clone()),
+                        cond: cond,
+                        then: then,
+                        inc: Node::Null(t.clone()),
+                    }),
+                    t.clone(),
+                ),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("{") {
@@ -168,7 +174,7 @@ impl<'a> Parser {
         let t = p.peek(0).clone();
         let (p, n) = self.expr(p)?;
         let (p, _) = p.take(";")?;
-        Ok((p, Node::ExprStmt(Box::new(Unary { left: n }),t)))
+        Ok((p, Node::ExprStmt(Box::new(Unary { left: n }), t)))
     }
 
     // compound-stmt = stmt* "}"
@@ -179,13 +185,13 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("}") {
                 p = p1;
                 break;
-            }  
+            }
             let (p1, n) = self.stmt(p.consume(0))?;
             p = p1;
             nodes.push(n);
         }
 
-        Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }),t)))
+        Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }), t)))
     }
 
     /// expr = assign
@@ -199,7 +205,7 @@ impl<'a> Parser {
         let (p, mut left) = self.equality(p)?;
         if let Ok((p1, _)) = p.consume(0).take("=") {
             let (p1, right) = self.assign(p1)?;
-            left = Node::Assign(Box::new(Binary { left, right }),t);
+            left = Node::Assign(Box::new(Binary { left, right }), t);
             return Ok((p1, left));
         }
         Ok((p, left))
@@ -252,7 +258,7 @@ impl<'a> Parser {
                         left: right,
                     }),
                     Operator::Le,
-                    t.clone()
+                    t.clone(),
                 );
                 continue;
             }
@@ -266,7 +272,7 @@ impl<'a> Parser {
                         left: right,
                     }),
                     Operator::Lt,
-                    t.clone()
+                    t.clone(),
                 );
                 continue;
             }
@@ -327,10 +333,10 @@ impl<'a> Parser {
                 Node::Binary(
                     Box::new(Binary {
                         left,
-                        right: Node::Number(0,t.clone()),
+                        right: Node::Number(0, t.clone()),
                     }),
                     Operator::Add,
-                    t.clone()
+                    t.clone(),
                 ),
             ));
         }
@@ -344,7 +350,7 @@ impl<'a> Parser {
                         right: right,
                     }),
                     Operator::Sub,
-                    t.clone()
+                    t.clone(),
                 ),
             ));
         }
@@ -359,7 +365,7 @@ impl<'a> Parser {
             let (p, _) = p.take(";")?;
             return Ok((p, node));
         }
-        if let Token::Identifier(x,_) = p.peek(0) {
+        if let Token::Identifier(x, _) = p.peek(0) {
             let var = if let Some(v) = self.find_var(x) {
                 v
             } else {
@@ -377,7 +383,7 @@ impl<'a> Parser {
 
     fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
         let t = p.peek(0).clone();
-        if let Token::Number(i,_) = p.peek(0) {
+        if let Token::Number(i, _) = p.peek(0) {
             return Ok((p.consume(1), Node::Number(*i, t)));
         }
         Err(Error::ParseError(format!("{:?}: not number", p.peek(0))))

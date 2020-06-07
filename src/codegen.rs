@@ -34,7 +34,7 @@ impl CodeGenerator {
 
         #[cfg(debug_assertions)]
         eprintln!("{:?}", program.stmt);
-        
+
         self.gen_stmt(&program.stmt, 0);
 
         // Epilogue
@@ -225,7 +225,7 @@ fn store(top: usize) -> usize {
     top - 1
 }
 
-fn is_null(node : &Node) ->bool {
+fn is_null(node: &Node) -> bool {
     match node {
         Node::Null(_) => true,
         _ => false,

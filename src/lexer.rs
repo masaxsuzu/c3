@@ -102,7 +102,7 @@ impl<'a> Lexer<'a> {
         }
 
         self.read_n(1);
-        Token::Illegal(start,self.pos)
+        Token::Illegal(start, self.pos)
     }
 
     fn starts_with(&self, word: &str) -> bool {
