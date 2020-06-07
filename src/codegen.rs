@@ -10,9 +10,8 @@ pub struct CodeGenerator {
 }
 
 impl CodeGenerator {
-
     pub fn new() -> Self {
-        CodeGenerator { label_seq : 0 }
+        CodeGenerator { label_seq: 0 }
     }
 
     pub fn gen(&mut self, mut program: Program) {
@@ -33,10 +32,8 @@ impl CodeGenerator {
         print!("  mov [rbp-24], r14\n");
         print!("  mov [rbp-32], r15\n");
 
-        for stmt in &program.nodes {
-            // eprintln!("{:?}\n", stmt);
-            self.gen_stmt(&stmt, 0);
-        }
+        // eprintln!("{:?}", program.stmt);
+        self.gen_stmt(&program.stmt, 0);
 
         // Epilogue
         print!(".L.return:\n");
@@ -50,8 +47,14 @@ impl CodeGenerator {
         print!("  ret\n");
     }
 
-    fn gen_stmt(&mut self, node: &Node, top: usize) -> usize {
+    fn gen_stmt(&mut self, node: &Node, mut top: usize) -> usize {
         match node {
+            Node::BlockStmt(block) => {
+                for stmt in block.nodes.iter() {
+                    top = self.gen_stmt(stmt, top);
+                }
+                return top;
+            }
             Node::ExprStmt(stmt) => {
                 let top = self.gen_expr(&stmt.left, top) - 1;
                 return top;
@@ -63,7 +66,7 @@ impl CodeGenerator {
                 return top;
             }
             Node::If(_if) => {
-                self.label_seq+=1;
+                self.label_seq += 1;
                 let seq = self.label_seq;
 
                 let top = if _if.otherwise != Node::Null {
@@ -87,7 +90,7 @@ impl CodeGenerator {
                 return top;
             }
             Node::Loop(_for) => {
-                self.label_seq+=1;
+                self.label_seq += 1;
                 let seq = self.label_seq;
 
                 let top = if _for.init != Node::Null {
@@ -120,13 +123,16 @@ impl CodeGenerator {
 
                 return top;
             }
+            Node::Null => {
+                return top;
+            }
             _ => {
                 unreachable!("must be statement {:?} \n", node);
             }
         }
     }
 
-    fn gen_expr(& self, expr: &Node, top: usize) -> usize {
+    fn gen_expr(&self, expr: &Node, top: usize) -> usize {
         match expr {
             Node::Number(i) => {
                 print!("  mov {}, {}\n", REG[top], i);
@@ -184,14 +190,14 @@ impl CodeGenerator {
         }
     }
 
-    fn gen_addr(& self, node: &Node, top: usize) -> usize {
+    fn gen_addr(&self, node: &Node, top: usize) -> usize {
         if let Node::Variable(var) = node {
             return self.gen_addr_var(var, top);
         }
         return top;
     }
 
-    fn gen_addr_var(& self, var: &Rc<RefCell<Variable>>, top: usize) -> usize {
+    fn gen_addr_var(&self, var: &Rc<RefCell<Variable>>, top: usize) -> usize {
         let v = var.borrow();
         print!("  lea {}, [rbp-{}]\n", REG[top], v.offset);
         return top + 1;

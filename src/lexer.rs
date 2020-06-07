@@ -7,7 +7,7 @@ pub struct Lexer<'a> {
     ch: u8,
     keywords: [&'a str; 5],
     two_letter_punctuations: [&'a str; 4],
-    one_letter_punctuations: [&'a str; 12],
+    one_letter_punctuations: [&'a str; 14],
 }
 
 impl<'a> Lexer<'a> {
@@ -19,7 +19,9 @@ impl<'a> Lexer<'a> {
             ch: 0,
             keywords: ["return", "if", "else", "for", "while"],
             two_letter_punctuations: ["==", "!=", "<=", ">="],
-            one_letter_punctuations: ["+", "-", "*", "/", "=", "!", "<", ">", ";", "=", "(", ")"],
+            one_letter_punctuations: [
+                "+", "-", "*", "/", "=", "!", "<", ">", ";", "=", "(", ")", "{", "}",
+            ],
         };
 
         lexer.read_char();
@@ -178,7 +180,7 @@ impl<'a> Iterator for Lexer<'a> {
         match self.next_token() {
             Token::Eof => None,
             x => {
-                // eprintln!("# {:?}\n", x);
+                // eprintln!("{:?}\n", x);
                 Some(x)
             }
         }

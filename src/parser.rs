@@ -1,4 +1,4 @@
-use crate::ast::{Binary, For, If, Node, Operator, Program, Unary, Variable};
+use crate::ast::{Binary, Block, For, If, Node, Operator, Program, Unary, Variable};
 use crate::error::Error;
 use crate::token::Token;
 use std::cell::RefCell;
@@ -70,21 +70,11 @@ impl<'a> Parser {
         None
     }
 
-    pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program, Error> {
-        let mut nodes = Vec::<Node>::new();
-        while p.peek(0) != &Token::Eof {
-            match self.stmt(p) {
-                Ok((p1, n)) => {
-                    p = p1;
-                    nodes.push(n);
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
-        }
+    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program, Error> {
+        let (_, n) = self.stmt(p)?;
+
         Ok(Program {
-            nodes: nodes,
+            stmt: n,
             locals: self.locals.clone(),
             stack_size: 0,
         })
@@ -94,13 +84,14 @@ impl<'a> Parser {
     //      | "if" "(" expr ")" stmt ("else" stmt)?
     //      | "for" "(" expr? ";" expr? ";" expr ")" stmt
     //      | "while" "(" expr ")" stmt
+    //      | "{" compound-stmt
     //      | expr ";"
     fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
         if let Ok((p, _)) = p.consume(0).take("return") {
             let (p, n) = self.expr(p)?;
             let (p, _) = p.take(";")?;
             return Ok((p, Node::Return(Box::new(Unary { left: n }))));
-        } 
+        }
         if let Ok((p, _)) = p.consume(0).take("if") {
             let (p, _) = p.consume(0).take("(")?;
             let (p, cond) = self.expr(p)?;
@@ -119,7 +110,7 @@ impl<'a> Parser {
                     otherwise: otherwise,
                 })),
             ));
-        } 
+        }
         if let Ok((p, _)) = p.consume(0).take("for") {
             let (p, _) = p.consume(0).take("(")?;
 
@@ -149,7 +140,7 @@ impl<'a> Parser {
                     then,
                 })),
             ));
-        } 
+        }
         if let Ok((p, _)) = p.consume(0).take("while") {
             let (p, _) = p.consume(0).take("(")?;
             let (p, cond) = self.expr(p)?;
@@ -164,10 +155,30 @@ impl<'a> Parser {
                     inc: Node::Null,
                 })),
             ));
-        } 
+        }
+        if let Ok((p, _)) = p.consume(0).take("{") {
+            return self.compound_stmt(p);
+        }
+
         let (p, n) = self.expr(p)?;
         let (p, _) = p.take(";")?;
         Ok((p, Node::ExprStmt(Box::new(Unary { left: n }))))
+    }
+
+    // compound-stmt = stmt* "}"
+    fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
+        let mut nodes = Vec::new();
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take("}") {
+                p = p1;
+                break;
+            }  
+            let (p1, n) = self.stmt(p.consume(0))?;
+            p = p1;
+            nodes.push(n);
+        }
+
+        Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }))))
     }
 
     /// expr = assign

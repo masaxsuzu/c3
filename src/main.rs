@@ -1,5 +1,5 @@
 extern crate c3;
-use c3::codegen::{CodeGenerator};
+use c3::codegen::CodeGenerator;
 use c3::lexer::Lexer;
 use c3::parser::{Parser, Tokens};
 use c3::token::Token;

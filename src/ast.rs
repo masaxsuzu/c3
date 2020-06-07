@@ -8,6 +8,7 @@ pub enum Node {
     Variable(Rc<RefCell<Variable>>),
     Assign(Box<Binary>),
     ExprStmt(Box<Unary>),
+    BlockStmt(Box<Block>),
     Return(Box<Unary>),
     If(Box<If>),
     Loop(Box<For>),
@@ -29,7 +30,7 @@ pub enum Operator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
-    pub nodes: Vec<Node>,
+    pub stmt: Node,
     pub locals: Vec<Rc<RefCell<Variable>>>,
     pub stack_size: i64,
 }
@@ -38,6 +39,11 @@ pub struct Program {
 pub struct Variable {
     pub name: String,
     pub offset: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block {
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
