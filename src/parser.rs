@@ -34,7 +34,7 @@ impl<'a> Tokens<'a> {
     pub fn peek(&self, n: usize) -> &Token {
         let i = self.pos + n;
         if i >= self.tokens.len() {
-            return &Token::Eof;
+            return &Token::Eof(0);  // dummy pos.
         }
         return &self.tokens[self.pos + n];
     }
@@ -340,7 +340,7 @@ impl<'a> Parser {
             let (p, _) = p.take(";")?;
             return Ok((p, node));
         }
-        if let Token::Identifier(x) = p.peek(0) {
+        if let Token::Identifier(x,_) = p.peek(0) {
             let var = if let Some(v) = self.find_var(x) {
                 v
             } else {
@@ -357,7 +357,7 @@ impl<'a> Parser {
     }
 
     fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
-        if let Token::Number(i) = p.peek(0) {
+        if let Token::Number(i,_) = p.peek(0) {
             return Ok((p.consume(1), Node::Number(*i)));
         }
         Err(Error::ParseError(format!("{:?}: not number", p.peek(0))))
