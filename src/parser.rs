@@ -93,6 +93,7 @@ impl<'a> Parser {
     // stmt = "return" expr ";"
     //      | "if" "(" expr ")" stmt ("else" stmt)?
     //      | "for" "(" expr? ";" expr? ";" expr ")" stmt
+    //      | "while" "(" expr ")" stmt
     //      | expr ";"
     fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node), Error> {
         if let Ok((p, _)) = p.consume(0).take("return") {
@@ -146,6 +147,21 @@ impl<'a> Parser {
                     cond,
                     inc,
                     then,
+                })),
+            ));
+        } 
+        if let Ok((p, _)) = p.consume(0).take("while") {
+            let (p, _) = p.consume(0).take("(")?;
+            let (p, cond) = self.expr(p)?;
+            let (p, _) = p.consume(0).take(")")?;
+            let (p, then) = self.stmt(p)?;
+            return Ok((
+                p,
+                Node::Loop(Box::new(For {
+                    init: Node::Null,
+                    cond: cond,
+                    then: then,
+                    inc: Node::Null,
                 })),
             ));
         } 
