@@ -8,13 +8,17 @@ use std::rc::Rc;
 pub struct Tokens<'a> {
     tokens: Rc<Vec<Token<'a>>>,
     pos: usize,
+    size: usize,
+    eof: Token<'a>,
 }
 
 impl<'a> Tokens<'a> {
-    pub fn new(pos: usize, input: Rc<Vec<Token<'a>>>) -> Self {
+    pub fn new(size: usize, pos: usize, input: Rc<Vec<Token<'a>>>) -> Self {
         let p = Tokens {
             tokens: input,
             pos: pos,
+            size: size,
+            eof: Token::Eof(size),
         };
         p
     }
@@ -23,7 +27,7 @@ impl<'a> Tokens<'a> {
     /// Consume n tokens and create rest tokens.
     ///
     pub fn consume(&self, n: usize) -> Self {
-        let p = Tokens::new(self.pos + n, Rc::clone(&self.tokens));
+        let p = Tokens::new(self.size, self.pos + n, Rc::clone(&self.tokens));
         p
     }
 
@@ -34,7 +38,7 @@ impl<'a> Tokens<'a> {
     pub fn peek(&self, n: usize) -> &Token<'a> {
         let i = self.pos + n;
         if i >= self.tokens.len() {
-            return &Token::Eof(0); // dummy pos.
+            return &self.eof;
         }
         return &self.tokens[self.pos + n];
     }
@@ -42,12 +46,12 @@ impl<'a> Tokens<'a> {
     ///
     /// Take the given reserved token.
     ///
-    pub fn take(&self, s: &str) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    pub fn take(&self, s: &str) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = self.peek(0).clone();
         if t.is_reserved(s) {
             return Ok((self.consume(1), Node::Null(t)));
         }
-        Err(Error::ParseError(format!("{:?}: not {}", self.peek(0), s)))
+        Err(Error::ParseError(format!("not {}", s), t.clone()))
     }
 }
 
@@ -58,7 +62,9 @@ pub struct Parser {
 
 impl<'a> Parser {
     pub fn new() -> Self {
-        Parser { locals: Vec::new() }
+        Parser {
+            locals: Vec::new(),
+        }
     }
 
     fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
@@ -70,7 +76,7 @@ impl<'a> Parser {
         None
     }
 
-    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error> {
+    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
         let (_, n) = self.stmt(p)?;
 
         Ok(Program {
@@ -86,7 +92,7 @@ impl<'a> Parser {
     //      | "while" "(" expr ")" stmt
     //      | "{" compound-stmt
     //      | expr ";"
-    fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn stmt(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         if let Ok((p, _)) = p.consume(0).take("return") {
             let t = p.peek(0).clone();
@@ -178,7 +184,7 @@ impl<'a> Parser {
     }
 
     // compound-stmt = stmt* "}"
-    fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let mut nodes = Vec::new();
         let t = p.peek(0).clone();
         loop {
@@ -195,12 +201,12 @@ impl<'a> Parser {
     }
 
     /// expr = assign
-    fn expr(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn expr(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         self.assign(p)
     }
 
     /// assign = equality ("=" assign)?
-    fn assign(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn assign(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         let (p, mut left) = self.equality(p)?;
         if let Ok((p1, _)) = p.consume(0).take("=") {
@@ -212,7 +218,7 @@ impl<'a> Parser {
     }
 
     /// equality = relational ("==" relational | "!=" relational)*
-    fn equality(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn equality(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         let (mut p, mut left) = self.relational(p)?;
         loop {
@@ -233,7 +239,7 @@ impl<'a> Parser {
     }
 
     /// relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
-    fn relational(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn relational(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         let (mut p, mut left) = self.add(p)?;
         loop {
@@ -281,7 +287,7 @@ impl<'a> Parser {
     }
 
     /// add = mul ("+" mul | "-" mul)*
-    fn add(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn add(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         let (mut p, mut left) = self.mul(p)?;
         loop {
@@ -302,7 +308,7 @@ impl<'a> Parser {
     }
 
     /// mul = unary ("*" unary | "/" unary)*
-    fn mul(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn mul(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         let (mut p, mut left) = self.unary(p)?;
         loop {
@@ -324,7 +330,7 @@ impl<'a> Parser {
 
     /// unary = ("+" | "-") unary
     ///       | primary
-    fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0);
         if let Ok((p, _)) = p.consume(0).take("+") {
             let (p, left) = self.unary(p)?;
@@ -358,7 +364,7 @@ impl<'a> Parser {
     }
 
     /// primary = "(" expr ")" | ident | num
-    fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         if let Ok((p, _)) = p.consume(0).take("(") {
             let (p, node) = self.expr(p)?;
@@ -381,11 +387,11 @@ impl<'a> Parser {
         self.num(p)
     }
 
-    fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error> {
+    fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         if let Token::Number(i, _) = p.peek(0) {
             return Ok((p.consume(1), Node::Number(*i, t)));
         }
-        Err(Error::ParseError(format!("{:?}: not number", p.peek(0))))
+        Err(Error::ParseError(format!("not number"), t.clone()))
     }
 }
