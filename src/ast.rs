@@ -14,12 +14,19 @@ pub enum Node<'a> {
     Return(Box<Unary<'a>>, Token<'a>),
     If(Box<If<'a>>, Token<'a>),
     Loop(Box<For<'a>>, Token<'a>),
-    Binary(Box<Binary<'a>>, Operator, Token<'a>),
+    Unary(Box<Unary<'a>>, Operator1, Token<'a>),
+    Binary(Box<Binary<'a>>, Operator2, Token<'a>),
     Null(Token<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Operator {
+pub enum Operator1 {
+    Addr,
+    Deref,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Operator2 {
     Add,
     Sub,
     Mul,

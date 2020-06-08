@@ -1,4 +1,4 @@
-use crate::ast::{Binary, Block, For, If, Node, Operator, Program, Unary, Variable};
+use crate::ast::{Binary, Block, For, If, Node, Operator1, Operator2, Program, Unary, Variable};
 use crate::error::Error;
 use crate::token::Token;
 use std::cell::RefCell;
@@ -62,9 +62,7 @@ pub struct Parser {
 
 impl<'a> Parser {
     pub fn new() -> Self {
-        Parser {
-            locals: Vec::new(),
-        }
+        Parser { locals: Vec::new() }
     }
 
     fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
@@ -225,13 +223,13 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("==") {
                 let (p1, right) = self.relational(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Eq, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Eq, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("!=") {
                 let (p2, right) = self.relational(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Ne, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Ne, t.clone());
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -246,13 +244,13 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("<=") {
                 let (p1, right) = self.add(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Le, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Le, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("<") {
                 let (p2, right) = self.add(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Lt, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Lt, t.clone());
                 continue;
             }
             if let Ok((p3, _)) = p.consume(0).take(">=") {
@@ -263,7 +261,7 @@ impl<'a> Parser {
                         right: left,
                         left: right,
                     }),
-                    Operator::Le,
+                    Operator2::Le,
                     t.clone(),
                 );
                 continue;
@@ -277,7 +275,7 @@ impl<'a> Parser {
                         right: left,
                         left: right,
                     }),
-                    Operator::Lt,
+                    Operator2::Lt,
                     t.clone(),
                 );
                 continue;
@@ -294,13 +292,13 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("+") {
                 let (p1, right) = self.mul(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Add, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Add, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("-") {
                 let (p2, right) = self.mul(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Sub, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Sub, t.clone());
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -315,20 +313,20 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("*") {
                 let (p1, right) = self.unary(p1)?;
                 p = p1;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Mul, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Mul, t.clone());
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("/") {
                 let (p2, right) = self.unary(p2)?;
                 p = p2;
-                left = Node::Binary(Box::new(Binary { left, right }), Operator::Div, t.clone());
+                left = Node::Binary(Box::new(Binary { left, right }), Operator2::Div, t.clone());
                 continue;
             }
             return Ok((p.consume(0), left));
         }
     }
 
-    /// unary = ("+" | "-") unary
+    /// unary = ("+" | "-" | "*" | "&") unary
     ///       | primary
     fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0);
@@ -341,7 +339,7 @@ impl<'a> Parser {
                         left,
                         right: Node::Number(0, t.clone()),
                     }),
-                    Operator::Add,
+                    Operator2::Add,
                     t.clone(),
                 ),
             ));
@@ -355,9 +353,23 @@ impl<'a> Parser {
                         left: Node::Number(0, t.clone()),
                         right: right,
                     }),
-                    Operator::Sub,
+                    Operator2::Sub,
                     t.clone(),
                 ),
+            ));
+        }
+        if let Ok((p, _)) = p.consume(0).take("&") {
+            let (p, left) = self.unary(p)?;
+            return Ok((
+                p,
+                Node::Unary(Box::new(Unary { left: left }), Operator1::Addr, t.clone()),
+            ));
+        }
+        if let Ok((p, _)) = p.consume(0).take("*") {
+            let (p, left) = self.unary(p)?;
+            return Ok((
+                p,
+                Node::Unary(Box::new(Unary { left: left }), Operator1::Deref, t.clone()),
             ));
         }
         self.primary(p)
@@ -368,7 +380,7 @@ impl<'a> Parser {
         let t = p.peek(0).clone();
         if let Ok((p, _)) = p.consume(0).take("(") {
             let (p, node) = self.expr(p)?;
-            let (p, _) = p.take(";")?;
+            let (p, _) = p.take(")")?;
             return Ok((p, node));
         }
         if let Token::Identifier(x, _) = p.peek(0) {
@@ -379,7 +391,7 @@ impl<'a> Parser {
                     name: x.to_string(),
                     offset: 0,
                 }));
-                self.locals.push(v);
+                self.locals.insert(0, v);
                 self.find_var(x).unwrap()
             };
             return Ok((p.consume(1), Node::Variable(var, t)));

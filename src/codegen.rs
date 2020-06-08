@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{Node, Operator, Program, Variable};
+use crate::ast::{Node, Operator1, Operator2, Program, Variable};
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 
@@ -149,6 +149,15 @@ impl CodeGenerator {
                 let top = self.gen_addr(&node.left, top);
                 return store(top);
             }
+            Node::Unary(node, Operator1::Deref, _) => {
+                let top = self.gen_expr(&node.left, top);
+                let top = load(top);
+                top
+            }
+            Node::Unary(node, Operator1::Addr, _) => {
+                let top = self.gen_addr(&node.left, top);
+                top
+            }
             Node::Binary(node, op, _) => {
                 let top = self.gen_expr(&node.left, top);
                 let top = self.gen_expr(&node.right, top);
@@ -156,31 +165,31 @@ impl CodeGenerator {
                 let rd = REG[top - 2];
                 let rs = REG[top - 1];
                 match op {
-                    Operator::Add => print!("  add {}, {}\n", rd, rs),
-                    Operator::Sub => print!("  sub {}, {}\n", rd, rs),
-                    Operator::Mul => print!("  imul {}, {}\n", rd, rs),
-                    Operator::Div => {
+                    Operator2::Add => print!("  add {}, {}\n", rd, rs),
+                    Operator2::Sub => print!("  sub {}, {}\n", rd, rs),
+                    Operator2::Mul => print!("  imul {}, {}\n", rd, rs),
+                    Operator2::Div => {
                         print!("  mov rax, {}\n", rd);
                         print!("  cqo\n");
                         print!("  idiv {}\n", rs);
                         print!("  mov {}, rax\n", rs);
                     }
-                    Operator::Eq => {
+                    Operator2::Eq => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  sete al\n");
                         print!("  movzb {}, al\n", rd);
                     }
-                    Operator::Ne => {
+                    Operator2::Ne => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  setne al\n");
                         print!("  movzb {}, al\n", rd);
                     }
-                    Operator::Lt => {
+                    Operator2::Lt => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  setl al\n");
                         print!("  movzb {}, al\n", rd);
                     }
-                    Operator::Le => {
+                    Operator2::Le => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  setle al\n");
                         print!("  movzb {}, al\n", rd);
@@ -196,7 +205,10 @@ impl CodeGenerator {
         if let Node::Variable(var, _) = node {
             return self.gen_addr_var(var, top);
         }
-        return top;
+        if let Node::Unary(deref, Operator1::Deref, _) = node {
+            return self.gen_expr(&deref.left, top);
+        }
+        unreachable!("{:?}", node);
     }
 
     fn gen_addr_var(&self, var: &Rc<RefCell<Variable>>, top: usize) -> usize {
@@ -207,12 +219,16 @@ impl CodeGenerator {
 }
 
 fn compute_offset(program: &mut Program) {
-    let mut offset = 0;
+    let mut offset = 32;
     for local in program.locals.iter() {
         offset += 8;
         local.borrow_mut().offset = offset;
     }
-    program.stack_size = offset;
+    program.stack_size = align_to(offset, 16);
+}
+
+fn align_to(n: i64, align: i64) -> i64 {
+    return (n + align - 1) & !(align - 1);
 }
 
 fn load(top: usize) -> usize {
