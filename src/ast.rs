@@ -4,9 +4,16 @@ use std::rc::Rc;
 use crate::token::Token;
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    Unknown,
+    Int,
+    Pointer(Box<Type>), // Pointer to X
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Node<'a> {
     Program(Box<Program<'a>>, Token<'a>),
-    Number(i64, Token<'a>),
+    Number(i64, Token<'a>, Type),
     Variable(Rc<RefCell<Variable>>, Token<'a>),
     Assign(Box<Binary<'a>>, Token<'a>),
     ExprStmt(Box<Unary<'a>>, Token<'a>),
@@ -14,8 +21,8 @@ pub enum Node<'a> {
     Return(Box<Unary<'a>>, Token<'a>),
     If(Box<If<'a>>, Token<'a>),
     Loop(Box<For<'a>>, Token<'a>),
-    Unary(Box<Unary<'a>>, Operator1, Token<'a>),
-    Binary(Box<Binary<'a>>, Operator2, Token<'a>),
+    Unary(Box<Unary<'a>>, Operator1, Token<'a>, Type),
+    Binary(Box<Binary<'a>>, Operator2, Token<'a>, Type),
     Null(Token<'a>),
 }
 
@@ -46,6 +53,7 @@ pub struct Program<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
+    pub ty: Type,
     pub name: String,
     pub offset: i64,
 }

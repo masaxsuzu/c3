@@ -136,7 +136,7 @@ impl CodeGenerator {
 
     fn gen_expr(&self, expr: &Node, top: usize) -> usize {
         match expr {
-            Node::Number(i, _) => {
+            Node::Number(i, _, _) => {
                 print!("  mov {}, {}\n", REG[top], i);
                 return top + 1;
             }
@@ -149,16 +149,16 @@ impl CodeGenerator {
                 let top = self.gen_addr(&node.left, top);
                 return store(top);
             }
-            Node::Unary(node, Operator1::Deref, _) => {
+            Node::Unary(node, Operator1::Deref, _, _) => {
                 let top = self.gen_expr(&node.left, top);
                 let top = load(top);
                 top
             }
-            Node::Unary(node, Operator1::Addr, _) => {
+            Node::Unary(node, Operator1::Addr, _, _) => {
                 let top = self.gen_addr(&node.left, top);
                 top
             }
-            Node::Binary(node, op, _) => {
+            Node::Binary(node, op, _, _) => {
                 let top = self.gen_expr(&node.left, top);
                 let top = self.gen_expr(&node.right, top);
 
@@ -205,7 +205,7 @@ impl CodeGenerator {
         if let Node::Variable(var, _) = node {
             return self.gen_addr_var(var, top);
         }
-        if let Node::Unary(deref, Operator1::Deref, _) = node {
+        if let Node::Unary(deref, Operator1::Deref, _, _) = node {
             return self.gen_expr(&deref.left, top);
         }
         unreachable!("{:?}", node);
