@@ -211,6 +211,16 @@ impl<'a> Parser {
         let (p, mut left) = self.equality(p)?;
         if let Ok((p1, _)) = p.consume(0).take("=") {
             let (p1, right) = self.assign(p1)?;
+            let _ = self.get_type(left.clone())?;
+            let tr = self.get_type(right.clone())?;
+
+            if let Node::Variable(v, _) = left.clone() {
+                let mut var = v.borrow_mut();
+                if var.ty == Type::Unknown {
+                    var.ty = tr;
+                }
+            }
+
             left = Node::Assign(Box::new(Binary { left, right }), t);
             return Ok((p1, left));
         }
@@ -250,9 +260,9 @@ impl<'a> Parser {
 
     /// relational = add ("<=" add | "<" add | ">=" add | ">"" add)*
     fn relational(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
-        let t = p.peek(0).clone();
         let (mut p, mut left) = self.add(p)?;
         loop {
+            let t = p.peek(0).clone();
             if let Ok((p1, _)) = p.consume(0).take("<=") {
                 let (p1, right) = self.add(p1)?;
                 p = p1;
@@ -310,29 +320,19 @@ impl<'a> Parser {
 
     /// add = mul ("+" mul | "-" mul)*
     fn add(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
-        let t = p.peek(0).clone();
         let (mut p, mut left) = self.mul(p)?;
         loop {
+            let t = p.peek(0).clone();
             if let Ok((p1, _)) = p.consume(0).take("+") {
                 let (p1, right) = self.mul(p1)?;
                 p = p1;
-                left = Node::Binary(
-                    Box::new(Binary { left, right }),
-                    Operator2::Add,
-                    t.clone(),
-                    Type::Int,
-                );
+                left = self.new_add_node(left, right, t.clone())?;
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("-") {
                 let (p2, right) = self.mul(p2)?;
                 p = p2;
-                left = Node::Binary(
-                    Box::new(Binary { left, right }),
-                    Operator2::Sub,
-                    t.clone(),
-                    Type::Int,
-                );
+                left = self.new_sub_node(left, right, t.clone())?;
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -378,30 +378,14 @@ impl<'a> Parser {
             let (p, left) = self.unary(p)?;
             return Ok((
                 p,
-                Node::Binary(
-                    Box::new(Binary {
-                        left,
-                        right: Node::Number(0, t.clone(), Type::Int),
-                    }),
-                    Operator2::Add,
-                    t.clone(),
-                    Type::Int,
-                ),
+                self.new_add_node(left, Node::Number(0, t.clone(), Type::Int), t.clone())?,
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("-") {
             let (p, right) = self.unary(p)?;
             return Ok((
                 p,
-                Node::Binary(
-                    Box::new(Binary {
-                        left: Node::Number(0, t.clone(), Type::Int),
-                        right: right,
-                    }),
-                    Operator2::Sub,
-                    t.clone(),
-                    Type::Int,
-                ),
+                self.new_sub_node(Node::Number(0, t.clone(), Type::Int), right, t.clone())?,
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("&") {
@@ -462,5 +446,104 @@ impl<'a> Parser {
             return Ok((p.consume(1), Node::Number(*i, t, Type::Int)));
         }
         Err(Error::ParseError(format!("not number"), t.clone()))
+    }
+
+    fn new_add_node(
+        &self,
+        left: Node<'a>,
+        right: Node<'a>,
+        t: Token<'a>,
+    ) -> Result<Node<'a>, Error<'a>> {
+        let tl = self.get_type(left.clone())?;
+        let tr = self.get_type(right.clone())?;
+
+        match (tl, tr) {
+            (Type::Int, Type::Int) => Ok(Node::Binary(
+                Box::new(Binary {
+                    left: left,
+                    right: right,
+                }),
+                Operator2::Add,
+                t.clone(),
+                Type::Int,
+            )),
+            (Type::Int, Type::Pointer(_)) => Ok(Node::Binary(
+                Box::new(Binary {
+                    left: left,
+                    right: right,
+                }),
+                Operator2::Add,
+                t.clone(),
+                Type::Int,
+            )),
+            (Type::Pointer(_), Type::Int) => Ok(Node::Binary(
+                Box::new(Binary {
+                    left: left,
+                    right: right,
+                }),
+                Operator2::Add,
+                t.clone(),
+                Type::Int,
+            )),
+            _ => Err(Error::ParseError("invalid operand".to_string(), t)),
+        }
+    }
+
+    fn new_sub_node(
+        &self,
+        left: Node<'a>,
+        right: Node<'a>,
+        t: Token<'a>,
+    ) -> Result<Node<'a>, Error<'a>> {
+        let tl = self.get_type(left.clone())?;
+        let tr = self.get_type(right.clone())?;
+
+        match (tl, tr) {
+            (Type::Int, Type::Int) => Ok(Node::Binary(
+                Box::new(Binary {
+                    left: left,
+                    right: right,
+                }),
+                Operator2::Sub,
+                t.clone(),
+                Type::Int,
+            )),
+            (Type::Int, Type::Pointer(_)) => Ok(Node::Binary(
+                Box::new(Binary {
+                    left: left,
+                    right: right,
+                }),
+                Operator2::Sub,
+                t.clone(),
+                Type::Int,
+            )),
+            (Type::Pointer(_), Type::Int) => Ok(Node::Binary(
+                Box::new(Binary {
+                    left: left,
+                    right: right,
+                }),
+                Operator2::Sub,
+                t.clone(),
+                Type::Int,
+            )),
+            _ => Err(Error::ParseError("invalid operand".to_string(), t)),
+        }
+    }
+
+    fn get_type(&self, node: Node<'a>) -> Result<Type, Error<'a>> {
+        match node {
+            Node::Variable(v, _) => {
+                let t = &v.borrow().ty;
+                Ok(t.clone())
+            }
+            Node::Assign(binary, _) => {
+                let x = *binary;
+                self.get_type(x.right)
+            }
+            Node::Number(_, _, ty) => Ok(ty),
+            Node::Unary(_, _, _, ty) => Ok(ty),
+            Node::Binary(_, _, _, ty) => Ok(ty),
+            _ => unreachable!("{:?}", node),
+        }
     }
 }

@@ -6,11 +6,11 @@ assert() {
   input="$3"
 
   if [ "$build" = "debug" ]; then
-    time cargo run -q -- "$input" > tmp.s
+    time cargo run -q -- "$input" > tmp.s || exit
     cc -o tmp tmp.s
     time ./tmp
   else
-    cargo run -q --release -- "$input" > tmp.s
+    cargo run -q --release -- "$input" > tmp.s || exit
     cc -o tmp tmp.s
     ./tmp
   fi
