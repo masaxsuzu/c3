@@ -390,25 +390,28 @@ impl<'a> Parser {
         }
         if let Ok((p, _)) = p.consume(0).take("&") {
             let (p, left) = self.unary(p)?;
+            let ty = self.get_type(left.clone())?;
             return Ok((
                 p,
                 Node::Unary(
                     Box::new(Unary { left: left }),
                     Operator1::Addr,
                     t.clone(),
-                    Type::Int,
+                    Type::Pointer(Box::new(ty)),
                 ),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("*") {
+            let t = p.peek(0).clone();
             let (p, left) = self.unary(p)?;
+            let base = self.get_base_type(left.clone(), t.clone())?;
             return Ok((
                 p,
                 Node::Unary(
                     Box::new(Unary { left: left }),
                     Operator1::Deref,
                     t.clone(),
-                    Type::Int,
+                    base,
                 ),
             ));
         }
@@ -448,6 +451,24 @@ impl<'a> Parser {
         Err(Error::ParseError(format!("not number"), t.clone()))
     }
 
+    fn new_binary_node(
+        left: Node<'a>,
+        right: Node<'a>,
+        op: Operator2,
+        t: Token<'a>,
+        ty: Type,
+    ) -> Node<'a> {
+        Node::Binary(
+            Box::new(Binary {
+                left: left,
+                right: right,
+            }),
+            op,
+            t,
+            ty,
+        )
+    }
+
     fn new_add_node(
         &self,
         left: Node<'a>,
@@ -458,32 +479,38 @@ impl<'a> Parser {
         let tr = self.get_type(right.clone())?;
 
         match (tl, tr) {
-            (Type::Int, Type::Int) => Ok(Node::Binary(
-                Box::new(Binary {
-                    left: left,
-                    right: right,
-                }),
+            (Type::Int, Type::Int) => Ok(Self::new_binary_node(
+                left,
+                right,
                 Operator2::Add,
-                t.clone(),
+                t,
                 Type::Int,
             )),
-            (Type::Int, Type::Pointer(_)) => Ok(Node::Binary(
-                Box::new(Binary {
-                    left: left,
-                    right: right,
-                }),
+            (Type::Int, Type::Pointer(_)) => Ok(Self::new_binary_node(
+                Self::new_binary_node(
+                    left,
+                    Node::Number(8, t.clone(), Type::Int),
+                    Operator2::Mul,
+                    t.clone(),
+                    Type::Int,
+                ),
+                right,
                 Operator2::Add,
-                t.clone(),
-                Type::Int,
+                t,
+                Type::Pointer(Box::new(Type::Int)),
             )),
-            (Type::Pointer(_), Type::Int) => Ok(Node::Binary(
-                Box::new(Binary {
-                    left: left,
-                    right: right,
-                }),
+            (Type::Pointer(_), Type::Int) => Ok(Self::new_binary_node(
+                left,
+                Self::new_binary_node(
+                    right,
+                    Node::Number(8, t.clone(), Type::Int),
+                    Operator2::Mul,
+                    t.clone(),
+                    Type::Int,
+                ),
                 Operator2::Add,
-                t.clone(),
-                Type::Int,
+                t,
+                Type::Pointer(Box::new(Type::Int)),
             )),
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
@@ -499,33 +526,37 @@ impl<'a> Parser {
         let tr = self.get_type(right.clone())?;
 
         match (tl, tr) {
-            (Type::Int, Type::Int) => Ok(Node::Binary(
-                Box::new(Binary {
-                    left: left,
-                    right: right,
-                }),
+            (Type::Int, Type::Int) => Ok(Self::new_binary_node(
+                left,
+                right,
                 Operator2::Sub,
-                t.clone(),
+                t,
                 Type::Int,
             )),
-            (Type::Int, Type::Pointer(_)) => Ok(Node::Binary(
-                Box::new(Binary {
-                    left: left,
-                    right: right,
-                }),
+            (Type::Pointer(_), Type::Int) => Ok(Self::new_binary_node(
+                left,
+                Self::new_binary_node(
+                    right,
+                    Node::Number(8, t.clone(), Type::Int),
+                    Operator2::Mul,
+                    t.clone(),
+                    Type::Int,
+                ),
                 Operator2::Sub,
-                t.clone(),
-                Type::Int,
+                t,
+                Type::Pointer(Box::new(Type::Int)),
             )),
-            (Type::Pointer(_), Type::Int) => Ok(Node::Binary(
-                Box::new(Binary {
-                    left: left,
-                    right: right,
-                }),
-                Operator2::Sub,
-                t.clone(),
-                Type::Int,
-            )),
+            (Type::Pointer(tl), Type::Pointer(_)) => {
+                let node = Self::new_binary_node(left, right, Operator2::Sub, t.clone(), Type::Pointer(tl.clone()));
+                let node = Self::new_binary_node(
+                    node,
+                    Node::Number(8, t.clone(), Type::Int),
+                    Operator2::Div,
+                    t.clone(),
+                    Type::Pointer(tl.clone()),
+                );
+                Ok(node)
+            }
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
     }
@@ -544,6 +575,14 @@ impl<'a> Parser {
             Node::Unary(_, _, _, ty) => Ok(ty),
             Node::Binary(_, _, _, ty) => Ok(ty),
             _ => unreachable!("{:?}", node),
+        }
+    }
+
+    fn get_base_type(&self, node: Node<'a>, t: Token<'a>) -> Result<Type, Error<'a>> {
+        let ty = self.get_type(node)?;
+        match ty {
+            Type::Pointer(to) => Ok(*to),
+            _ => Err(Error::ParseError("Not pointer".to_string(), t)),
         }
     }
 }

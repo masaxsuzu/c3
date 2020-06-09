@@ -88,9 +88,10 @@ assert $build 3 '{ x=3; y=&x; z=&y; return **z; }'
 assert $build 5 '{ x=3; y=&x; *y=5; return x; }'
 
 # The local variable order is chibicc's ABI.
-assert $build 5 '{ x=3; y=5; return *(&x+8); }'
-assert $build 3 '{ x=3; y=5; return *(&y-8); }'
-assert $build 7 '{ x=3; y=5; *(&x+8)=7; return y; }'
-assert $build 7 '{ x=3; y=5; *(&y-8)=7; return x; }'
+assert $build 5 '{ x=3; y=5; return *(&x+1); }'
+assert $build 3 '{ x=3; y=5; return *(&y-1); }'
+assert $build 7 '{ x=3; y=5; *(&x+1)=7; return y; }'
+assert $build 7 '{ x=3; y=5; *(&y-1)=7; return x; }'
 
+assert $build 2 '{ x=3; return (&x+2)-&x; }'
 echo OK

@@ -172,7 +172,7 @@ impl CodeGenerator {
                         print!("  mov rax, {}\n", rd);
                         print!("  cqo\n");
                         print!("  idiv {}\n", rs);
-                        print!("  mov {}, rax\n", rs);
+                        print!("  mov {}, rax\n", rd);
                     }
                     Operator2::Eq => {
                         print!("  cmp {}, {}\n", rd, rs);
