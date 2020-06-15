@@ -15,12 +15,13 @@ pub enum Node<'a> {
     Program(Box<Program<'a>>, Token<'a>),
     Number(i64, Token<'a>, Type),
     Variable(Rc<RefCell<Variable>>, Token<'a>),
-    Assign(Box<Binary<'a>>, Token<'a>),
+
     ExprStmt(Box<Unary<'a>>, Token<'a>),
     BlockStmt(Box<Block<'a>>, Token<'a>),
     Return(Box<Unary<'a>>, Token<'a>),
     If(Box<If<'a>>, Token<'a>),
     Loop(Box<For<'a>>, Token<'a>),
+    Assign(Box<Binary<'a>>, Token<'a>, Type),
     Unary(Box<Unary<'a>>, Operator1, Token<'a>, Type),
     Binary(Box<Binary<'a>>, Operator2, Token<'a>, Type),
     Null(Token<'a>),
@@ -30,6 +31,7 @@ pub enum Node<'a> {
 pub enum Operator1 {
     Addr,
     Deref,
+    ExprStmt,
 }
 
 #[derive(Debug, Clone, PartialEq)]

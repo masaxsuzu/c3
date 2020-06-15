@@ -144,7 +144,7 @@ impl CodeGenerator {
                 let top = self.gen_addr_var(var, top);
                 return load(top);
             }
-            Node::Assign(node, _) => {
+            Node::Assign(node, _, _) => {
                 let top = self.gen_expr(&node.right, top);
                 let top = self.gen_addr(&node.left, top);
                 return store(top);

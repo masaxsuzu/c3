@@ -76,6 +76,11 @@ impl<'a> Parser {
         None
     }
 
+    
+    ///
+    /// Parse Nodes
+    /// 
+
     pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
         let (_, n) = self.stmt(p)?;
 
@@ -183,6 +188,57 @@ impl<'a> Parser {
         Ok((p, Node::ExprStmt(Box::new(Unary { left: n }), t)))
     }
 
+    // declaration = typespec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
+    fn declaration(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
+        let mut nodes = Vec::<Node<'a>>::new();
+        let (mut p, ty) = self.typespec(p.consume(0))?;
+        let t = p.consume(0).peek(0).clone();
+
+        let mut after_second :Option<()> = None; 
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take(";") {
+                return Ok((p1, Node::BlockStmt(Box::new(Block { nodes: nodes }), t.clone())));
+            }
+
+            if let Some(_) = after_second {
+
+                let (p2, _) = p.consume(0).take(",")?;
+                p = p2;
+            }  else {
+                after_second = Some(());
+            }
+
+            let (p3 , ty)  = self.declarator(p.consume(0), ty.clone())?;
+            let (var, name) = if let Token::Identifier(x, _) = p3.peek(0).clone() {
+                let v = Rc::new(RefCell::new(Variable {
+                    name: x.to_string(),
+                    offset: 0,
+                    ty: ty.clone(),
+                }));
+                (v, x)
+            } else {
+                return Err(Error::ParseError("Not identifier".to_string(), p.peek(0).clone()));
+            };
+            p = p3.consume(1);
+            self.locals.insert(0, var);
+
+            if let Ok((p4, _)) = p.consume(0).take("=") {
+                p = p4;
+            } else {
+                continue;
+            }
+
+            let var = self.find_var(name).unwrap();
+            let left = Node::Variable(var, p.peek(0).clone());
+
+            let (p5, right) = self.assign(p.consume(0))?;
+            p = p5;
+
+            let node = Node::Assign(Box::new(Binary { left, right }), t.clone(), ty.clone());
+            nodes.push(Node::ExprStmt(Box::new(Unary { left: node }), t.clone()));
+        }
+    }
+
     // compound-stmt = stmt* "}"
     fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let mut nodes = Vec::new();
@@ -192,8 +248,12 @@ impl<'a> Parser {
                 p = p1;
                 break;
             }
-            let (p1, n) = self.stmt(p.consume(0))?;
-            p = p1;
+            let (p2, n) = if let Ok((_,_)) = p.consume(0).take("int") {
+                 self.declaration(p)?
+            } else {
+                 self.stmt(p.consume(0))?
+            };
+            p = p2;
             nodes.push(n);
         }
 
@@ -217,11 +277,11 @@ impl<'a> Parser {
             if let Node::Variable(v, _) = left.clone() {
                 let mut var = v.borrow_mut();
                 if var.ty == Type::Unknown {
-                    var.ty = tr;
+                    var.ty = tr.clone();
                 }
             }
 
-            left = Node::Assign(Box::new(Binary { left, right }), t);
+            left = Node::Assign(Box::new(Binary { left, right }), t, tr);
             return Ok((p1, left));
         }
         Ok((p, left))
@@ -379,13 +439,7 @@ impl<'a> Parser {
             let var = if let Some(v) = self.find_var(x) {
                 v
             } else {
-                let v = Rc::new(RefCell::new(Variable {
-                    name: x.to_string(),
-                    offset: 0,
-                    ty: Type::Unknown,
-                }));
-                self.locals.insert(0, v);
-                self.find_var(x).unwrap()
+                return Err(Error::ParseError("undefined variable".to_string(), p.peek(0).clone()));
             };
             return Ok((p.consume(1), Node::Variable(var, t)));
         }
@@ -400,6 +454,32 @@ impl<'a> Parser {
         Err(Error::ParseError(format!("not number"), t.clone()))
     }
 
+    ///
+    /// Parse type
+    ///
+    
+    // typespec = "int"
+    fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>>{
+        let (p, _) = p.consume(0).take("int")?;
+        Ok((p,Type::Int))
+    }
+
+    // declarator = "*"* ident
+    fn declarator(&self, mut p: Tokens<'a>, ty : Type) -> Result<(Tokens<'a>, Type), Error<'a>>{
+        let mut t = ty;
+        while let Ok((p1,_)) = p.consume(0).take("*") {
+            t = Type::Pointer(Box::new(t));
+            p = p1;
+        }
+        if let Token::Identifier(_, _)  = p.peek(0){
+            return Ok((p.consume(0), t))
+        }
+        Err(Error::ParseError("Not identifier".to_string(), p.peek(0).clone()))
+    }
+
+    ///
+    /// Helper
+    /// 
     fn new_unary_node(left: Node<'a>, op: Operator1, t: Token<'a>, ty: Type) -> Node<'a> {
         Node::Unary(Box::new(Unary { left: left }), op, t, ty)
     }
@@ -526,10 +606,7 @@ impl<'a> Parser {
                 let t = &v.borrow().ty;
                 Ok(t.clone())
             }
-            Node::Assign(binary, _) => {
-                let x = *binary;
-                self.get_type(x.right)
-            }
+            Node::Assign(_, _, ty) => Ok(ty),
             Node::Number(_, _, ty) => Ok(ty),
             Node::Unary(_, _, _, ty) => Ok(ty),
             Node::Binary(_, _, _, ty) => Ok(ty),
