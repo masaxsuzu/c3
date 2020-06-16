@@ -1,5 +1,6 @@
 use crate::ast::{
-    Binary, Block, For, If, Node, Operator1, Operator2, Program, Type, Unary, Variable,
+    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Program, Type, Unary,
+    Variable,
 };
 use crate::error::Error;
 use crate::token::Token;
@@ -431,7 +432,8 @@ impl<'a> Parser {
         self.primary(p)
     }
 
-    /// primary = "(" expr ")" | ident | num
+    /// primary = "(" expr ")" | ident args? | num
+    /// args = "(" ")"
     fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         if let Ok((p, _)) = p.consume(0).take("(") {
@@ -440,6 +442,17 @@ impl<'a> Parser {
             return Ok((p, node));
         }
         if let Token::Identifier(x, _) = p.peek(0) {
+            if let Ok((p, _)) = p.consume(1).take("(") {
+                let call = Node::FuncCall(
+                    Box::new(FunctionCall {
+                        name: x.to_string(),
+                    }),
+                    t.clone(),
+                );
+                let (p, _) = p.take(")")?;
+
+                return Ok((p, call));
+            }
             let var = if let Some(v) = self.find_var(x) {
                 v
             } else {

@@ -15,7 +15,7 @@ pub enum Node<'a> {
     Program(Box<Program<'a>>, Token<'a>),
     Number(i64, Token<'a>, Type),
     Variable(Rc<RefCell<Variable>>, Token<'a>),
-
+    FuncCall(Box<FunctionCall>, Token<'a>),
     ExprStmt(Box<Unary<'a>>, Token<'a>),
     BlockStmt(Box<Block<'a>>, Token<'a>),
     Return(Box<Unary<'a>>, Token<'a>),
@@ -58,6 +58,11 @@ pub struct Variable {
     pub ty: Type,
     pub name: String,
     pub offset: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionCall {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

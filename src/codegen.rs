@@ -144,6 +144,16 @@ impl CodeGenerator {
                 let top = self.gen_addr_var(var, top);
                 return load(top);
             }
+            Node::FuncCall(call, _) => {
+                print!("  push r10\n");
+                print!("  push r11\n");
+                print!("  mov rax, 0\n");
+                print!("  call {}\n", call.name);
+                print!("  mov {}, rax\n", REG[top]);
+                print!("  push r11\n");
+                print!("  push r10\n");
+                return top + 1;
+            }
             Node::Assign(node, _, _) => {
                 let top = self.gen_expr(&node.right, top);
                 let top = self.gen_addr(&node.left, top);

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+cat <<EOF | gcc -xc -c -o tmp2.o -
+int ret3() { return 3; }
+int ret5() { return 5; }
+EOF
+
 assert() {
   build="$1"
   want="$2"
@@ -7,11 +12,11 @@ assert() {
 
   if [ "$build" = "debug" ]; then
     time cargo run -q -- "$input" > tmp.s || exit
-    cc -o tmp tmp.s
+    cc -o tmp tmp.s tmp2.o
     time ./tmp
   else
     cargo run -q --release -- "$input" > tmp.s || exit
-    cc -o tmp tmp.s
+    cc -o tmp tmp.s tmp2.o
     ./tmp
   fi
 
@@ -96,5 +101,8 @@ assert $build 7 '{ int x=3; int y=5; *(&y-1)=7; return x; }'
 assert $build 2 '{ int x=3; return (&x+2)-&x; }'
 assert $build 8 '{ int x=3, y=5; return x+y; }'
 assert $build 8 '{ int x, y; x=3; y=5; return x+y; }'
+
+assert $build 3 '{ return ret3(); }'
+assert $build 5 '{ return ret5(); }'
 
 echo OK
