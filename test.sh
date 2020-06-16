@@ -104,5 +104,6 @@ assert $build 8 '{ int x, y; x=3; y=5; return x+y; }'
 
 assert $build 3 '{ return ret3(); }'
 assert $build 5 '{ return ret5(); }'
+assert $build 16 '{ int x = ret3()*ret5() + 1; return x; }'
 
 echo OK

@@ -448,6 +448,7 @@ impl<'a> Parser {
                         name: x.to_string(),
                     }),
                     t.clone(),
+                    Type::Int,
                 );
                 let (p, _) = p.take(")")?;
 
@@ -633,6 +634,7 @@ impl<'a> Parser {
             Node::Number(_, _, ty) => Ok(ty),
             Node::Unary(_, _, _, ty) => Ok(ty),
             Node::Binary(_, _, _, ty) => Ok(ty),
+            Node::FuncCall(_, _, ty) => Ok(ty),
             _ => unreachable!("{:?}", node),
         }
     }

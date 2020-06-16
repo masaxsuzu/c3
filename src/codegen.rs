@@ -144,7 +144,7 @@ impl CodeGenerator {
                 let top = self.gen_addr_var(var, top);
                 return load(top);
             }
-            Node::FuncCall(call, _) => {
+            Node::FuncCall(call, _, _) => {
                 print!("  push r10\n");
                 print!("  push r11\n");
                 print!("  mov rax, 0\n");
