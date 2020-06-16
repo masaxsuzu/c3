@@ -76,10 +76,9 @@ impl<'a> Parser {
         None
     }
 
-    
     ///
     /// Parse Nodes
-    /// 
+    ///
 
     pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
         let (_, n) = self.stmt(p)?;
@@ -194,21 +193,23 @@ impl<'a> Parser {
         let (mut p, ty) = self.typespec(p.consume(0))?;
         let t = p.consume(0).peek(0).clone();
 
-        let mut after_second :Option<()> = None; 
+        let mut after_second: Option<()> = None;
         loop {
             if let Ok((p1, _)) = p.consume(0).take(";") {
-                return Ok((p1, Node::BlockStmt(Box::new(Block { nodes: nodes }), t.clone())));
+                return Ok((
+                    p1,
+                    Node::BlockStmt(Box::new(Block { nodes: nodes }), t.clone()),
+                ));
             }
 
             if let Some(_) = after_second {
-
                 let (p2, _) = p.consume(0).take(",")?;
                 p = p2;
-            }  else {
+            } else {
                 after_second = Some(());
             }
 
-            let (p3 , ty)  = self.declarator(p.consume(0), ty.clone())?;
+            let (p3, ty) = self.declarator(p.consume(0), ty.clone())?;
             let (var, name) = if let Token::Identifier(x, _) = p3.peek(0).clone() {
                 let v = Rc::new(RefCell::new(Variable {
                     name: x.to_string(),
@@ -217,7 +218,10 @@ impl<'a> Parser {
                 }));
                 (v, x)
             } else {
-                return Err(Error::ParseError("Not identifier".to_string(), p.peek(0).clone()));
+                return Err(Error::ParseError(
+                    "Not identifier".to_string(),
+                    p.peek(0).clone(),
+                ));
             };
             p = p3.consume(1);
             self.locals.insert(0, var);
@@ -248,10 +252,10 @@ impl<'a> Parser {
                 p = p1;
                 break;
             }
-            let (p2, n) = if let Ok((_,_)) = p.consume(0).take("int") {
-                 self.declaration(p)?
+            let (p2, n) = if let Ok((_, _)) = p.consume(0).take("int") {
+                self.declaration(p)?
             } else {
-                 self.stmt(p.consume(0))?
+                self.stmt(p.consume(0))?
             };
             p = p2;
             nodes.push(n);
@@ -439,7 +443,10 @@ impl<'a> Parser {
             let var = if let Some(v) = self.find_var(x) {
                 v
             } else {
-                return Err(Error::ParseError("undefined variable".to_string(), p.peek(0).clone()));
+                return Err(Error::ParseError(
+                    "undefined variable".to_string(),
+                    p.peek(0).clone(),
+                ));
             };
             return Ok((p.consume(1), Node::Variable(var, t)));
         }
@@ -457,29 +464,32 @@ impl<'a> Parser {
     ///
     /// Parse type
     ///
-    
+
     // typespec = "int"
-    fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>>{
+    fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>> {
         let (p, _) = p.consume(0).take("int")?;
-        Ok((p,Type::Int))
+        Ok((p, Type::Int))
     }
 
     // declarator = "*"* ident
-    fn declarator(&self, mut p: Tokens<'a>, ty : Type) -> Result<(Tokens<'a>, Type), Error<'a>>{
+    fn declarator(&self, mut p: Tokens<'a>, ty: Type) -> Result<(Tokens<'a>, Type), Error<'a>> {
         let mut t = ty;
-        while let Ok((p1,_)) = p.consume(0).take("*") {
+        while let Ok((p1, _)) = p.consume(0).take("*") {
             t = Type::Pointer(Box::new(t));
             p = p1;
         }
-        if let Token::Identifier(_, _)  = p.peek(0){
-            return Ok((p.consume(0), t))
+        if let Token::Identifier(_, _) = p.peek(0) {
+            return Ok((p.consume(0), t));
         }
-        Err(Error::ParseError("Not identifier".to_string(), p.peek(0).clone()))
+        Err(Error::ParseError(
+            "Not identifier".to_string(),
+            p.peek(0).clone(),
+        ))
     }
 
     ///
     /// Helper
-    /// 
+    ///
     fn new_unary_node(left: Node<'a>, op: Operator1, t: Token<'a>, ty: Type) -> Node<'a> {
         Node::Unary(Box::new(Unary { left: left }), op, t, ty)
     }
