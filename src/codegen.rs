@@ -4,6 +4,7 @@ use std::rc::Rc;
 use crate::ast::{Node, Operator1, Operator2, Program, Variable};
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
+const ARGREG: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
 pub struct CodeGenerator {
     label_seq: i64,
@@ -145,14 +146,27 @@ impl CodeGenerator {
                 return load(top);
             }
             Node::FuncCall(call, _, _) => {
+                let mut n = 0;
+                let mut t = top;
+                
+                for arg in call.args.iter() {
+                    t = self.gen_expr(arg, t);
+                    n += 1;
+                }
+
+                for i in 1..n+1 {
+                    t -= 1;
+                    print!("  mov {}, {}\n", ARGREG[n - i], REG[t]);
+                }
+
                 print!("  push r10\n");
                 print!("  push r11\n");
                 print!("  mov rax, 0\n");
-                print!("  call {}\n", call.name);
-                print!("  mov {}, rax\n", REG[top]);
                 print!("  push r11\n");
                 print!("  push r10\n");
-                return top + 1;
+                print!("  call {}\n", call.name);
+                print!("  mov {}, rax\n", REG[t]);
+                return t + 1;
             }
             Node::Assign(node, _, _) => {
                 let top = self.gen_expr(&node.right, top);

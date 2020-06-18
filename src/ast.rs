@@ -20,7 +20,7 @@ pub enum Node<'a> {
     Return(Box<Unary<'a>>, Token<'a>),
     If(Box<If<'a>>, Token<'a>),
     Loop(Box<For<'a>>, Token<'a>),
-    FuncCall(Box<FunctionCall>, Token<'a>, Type),
+    FuncCall(Box<FunctionCall<'a>>, Token<'a>, Type),
     Assign(Box<Binary<'a>>, Token<'a>, Type),
     Unary(Box<Unary<'a>>, Operator1, Token<'a>, Type),
     Binary(Box<Binary<'a>>, Operator2, Token<'a>, Type),
@@ -61,8 +61,9 @@ pub struct Variable {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FunctionCall {
+pub struct FunctionCall<'a> {
     pub name: String,
+    pub args: Vec<Node<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

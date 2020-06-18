@@ -432,6 +432,44 @@ impl<'a> Parser {
         self.primary(p)
     }
 
+    /// funcall = ident "(" (assign ("," assign)*)? ")"
+    fn funccall(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
+        let t = p.peek(0).clone();
+        let x = if let Token::Identifier(x, _) = p.peek(0) {
+            *x
+        } else {
+            return Err(Error::ParseError("not identifier".to_owned(),t));
+        };
+
+        let mut args = Vec::<Node>::new();
+
+        let (mut p, _) = p.consume(1).take("(")?;
+
+        if let Ok((mut p1, node)) = self.assign(p.consume(0)) {
+            args.push(node);
+            loop {
+                if let Ok((p2, _)) = p1.consume(0).take(",") {
+                    let (p2, node) = self.assign(p2)?;
+                    args.push(node);
+                    p1 = p2;
+                } else {
+                    break;
+                }
+            }
+            p = p1;    
+        }
+        let call = Node::FuncCall(
+            Box::new(FunctionCall {
+                name: x.to_string(),
+                args: args,
+            }),
+            t.clone(),
+            Type::Int,
+        );
+        let (p, _) = p.take(")")?;
+        return Ok((p, call));
+    }
+
     /// primary = "(" expr ")" | ident args? | num
     /// args = "(" ")"
     fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
@@ -442,17 +480,8 @@ impl<'a> Parser {
             return Ok((p, node));
         }
         if let Token::Identifier(x, _) = p.peek(0) {
-            if let Ok((p, _)) = p.consume(1).take("(") {
-                let call = Node::FuncCall(
-                    Box::new(FunctionCall {
-                        name: x.to_string(),
-                    }),
-                    t.clone(),
-                    Type::Int,
-                );
-                let (p, _) = p.take(")")?;
-
-                return Ok((p, call));
+            if let Ok((_, _)) = p.consume(1).take("(") {
+                return self.funccall(p);
             }
             let var = if let Some(v) = self.find_var(x) {
                 v

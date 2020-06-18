@@ -3,6 +3,11 @@
 cat <<EOF | gcc -xc -c -o tmp2.o -
 int ret3() { return 3; }
 int ret5() { return 5; }
+int add(int x, int y) { return x+y; }
+int sub(int x, int y) { return x-y; }
+int add6(int a, int b, int c, int d, int e, int f) {
+  return a+b+c+d+e+f;
+}
 EOF
 
 assert() {
@@ -105,5 +110,8 @@ assert $build 8 '{ int x, y; x=3; y=5; return x+y; }'
 assert $build 3 '{ return ret3(); }'
 assert $build 5 '{ return ret5(); }'
 assert $build 16 '{ int x = ret3()*ret5() + 1; return x; }'
+assert $build 8 '{ return add(3, 5); }'
+assert $build 2 '{ return sub(5, 3); }'
+assert $build 21 '{ return add6(1,2,3,4,5,6); }'
 
 echo OK
