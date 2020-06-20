@@ -8,6 +8,7 @@ pub enum Type {
     Unknown,
     Int,
     Pointer(Box<Type>), // Pointer to X
+    Function(Box<Type>, String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

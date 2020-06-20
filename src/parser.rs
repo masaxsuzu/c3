@@ -98,25 +98,21 @@ impl<'a> Parser {
         Ok(Program {functions})
     }
 
-    // func = "typespec" ident "(" ")" compound_stmt
+    // func = "typespec" "declarator" compound_stmt
     fn func(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Function<'a>), Error<'a>> {
         let (p, ty) = self.typespec(p.consume(0))?;
-        let name = if let Token::Identifier(x, _) = p.peek(0).clone() {
-            x
+        let (p, ty) = self.declarator(p.consume(0), ty)?;
+        let (ty, name) = if let Type::Function(_, name) = ty.clone() {
+            (ty, name)
         } else {
-            return Err(Error::ParseError("not function name".to_owned(), p.peek(0).clone()));
+            return Err(Error::ParseError("Not function name".to_owned(), p.peek(0).clone()));
         };
-
-        let p = p.consume(1);
-
-        let (p, _) = p.take("(")?;
-        let (p, _) = p.take(")")?;
         let (p, _) = p.take("{")?;
 
         let (p, stmt) = self.compound_stmt(p)?;
 
         let f = Function {
-            name: name.to_owned(),
+            name: name,
             ty: ty,
             stmt: stmt,
             locals: self.locals.clone(),
@@ -556,7 +552,8 @@ impl<'a> Parser {
             t = Type::Pointer(Box::new(t));
             p = p1;
         }
-        if let Token::Identifier(_, _) = p.peek(0) {
+        if let Token::Identifier(name, _) = p.peek(0) {
+            let (p, t) = self.type_suffix(p.consume(0), t, name)?;
             return Ok((p.consume(0), t));
         }
         Err(Error::ParseError(
@@ -564,6 +561,17 @@ impl<'a> Parser {
             p.peek(0).clone(),
         ))
     }
+
+    // type-suffix = ("(" func-params)?
+    fn type_suffix(&self, p: Tokens<'a>, ty: Type, name: &str) -> Result<(Tokens<'a>, Type), Error<'a>> {
+        let (p, ty) = if let Ok((p,_ )) = p.consume(1).take("(") {
+            let (p, _) = p.take(")")?;
+            (p, Type::Function(Box::new(ty), name.to_string()))
+        } else {
+            (p, ty)
+        };
+        Ok((p, ty))
+      }
 
     ///
     /// Helper
@@ -692,6 +700,10 @@ impl<'a> Parser {
         match node {
             Node::Variable(v, _) => {
                 let t = &v.borrow().ty;
+                Ok(t.clone())
+            }
+            Node::Function(f, _) => {
+                let t = &f.ty;
                 Ok(t.clone())
             }
             Node::Assign(_, _, ty) => Ok(ty),
