@@ -1,5 +1,5 @@
 use crate::ast::{
-    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Function, Type, Unary,
+    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Function, Program, Type, Unary,
     Variable,
 };
 use crate::error::Error;
@@ -81,14 +81,39 @@ impl<'a> Parser {
     /// Parse Nodes
     ///
 
-    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Function<'a>, Error<'a>> {
-        let (_, n) = self.stmt(p)?;
+    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
+        let (_, func) = self.func(p)?;
 
-        Ok(Function {
-            stmt: n,
+        Ok(Program {
+            functions: vec![Rc::new(RefCell::new(func))],
+        })
+    }
+
+    // func = "typespec" ident "(" ")" stmt
+    fn func(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Function<'a>), Error<'a>> {
+        let (p, ty) = self.typespec(p.consume(0))?;
+        let name = if let Token::Identifier(x, _) = p.peek(0).clone() {
+            x
+        } else {
+            return Err(Error::ParseError("not function name".to_owned(), p.peek(0).clone()));
+        };
+
+        let p = p.consume(1);
+
+        let (p, _) = p.take("(")?;
+        let (p, _) = p.take(")")?;
+
+        let (p, stmt) = self.stmt(p)?;
+
+        let f = Function {
+            name: name.to_owned(),
+            ty: ty,
+            stmt: stmt,
             locals: self.locals.clone(),
             stack_size: 0,
-        })
+        };
+
+        Ok((p, f))
     }
 
     // stmt = "return" expr ";"

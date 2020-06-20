@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{Node, Operator1, Operator2, Function, Variable};
+use crate::ast::{Node, Operator1, Operator2, Program, Function, Variable};
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 const ARGREG: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -15,39 +15,44 @@ impl CodeGenerator {
         CodeGenerator { label_seq: 0 }
     }
 
-    pub fn gen(&mut self, mut function: Function) {
-        compute_offset(&mut function);
-
+    pub fn gen(&mut self, mut prog: Program) {
+        for function in prog.functions.iter_mut() {
+            compute_offset(&mut function.borrow_mut());
+        }
         // eprintln!("{:?}\n",program);
 
         print!(".intel_syntax noprefix\n");
-        print!(".globl main\n");
-        print!("main:\n");
 
-        // Prologue. r12-15 are callee-saved registers.
-        print!("  push rbp\n");
-        print!("  mov rbp, rsp\n");
-        print!("  sub rsp, {}\n", function.stack_size);
-        print!("  mov [rbp-8], r12\n");
-        print!("  mov [rbp-16], r13\n");
-        print!("  mov [rbp-24], r14\n");
-        print!("  mov [rbp-32], r15\n");
+        for f in prog.functions.iter().as_ref() {
+            let function = f.borrow();
+            print!(".globl {}\n", function.name);
+            print!("{}:\n", function.name);
 
-        #[cfg(debug_assertions)]
-        eprintln!("{:?}", function.stmt);
+            // Prologue. r12-15 are callee-saved registers.
+            print!("  push rbp\n");
+            print!("  mov rbp, rsp\n");
+            print!("  sub rsp, {}\n", function.stack_size);
+            print!("  mov [rbp-8], r12\n");
+            print!("  mov [rbp-16], r13\n");
+            print!("  mov [rbp-24], r14\n");
+            print!("  mov [rbp-32], r15\n");
 
-        self.gen_stmt(&function.stmt, 0);
+            #[cfg(debug_assertions)]
+            eprintln!("{:?}", function.stmt);
 
-        // Epilogue
-        print!(".L.return:\n");
-        print!("  mov r12, [rbp-8]\n");
-        print!("  mov r13, [rbp-16]\n");
-        print!("  mov r14, [rbp-24]\n");
-        print!("  mov r15, [rbp-32]\n");
-        print!("  mov rsp, rbp\n");
-        print!("  pop rbp\n");
+            self.gen_stmt(&function.stmt, 0);
 
-        print!("  ret\n");
+            // Epilogue
+            print!(".L.return:\n");
+            print!("  mov r12, [rbp-8]\n");
+            print!("  mov r13, [rbp-16]\n");
+            print!("  mov r14, [rbp-24]\n");
+            print!("  mov r15, [rbp-32]\n");
+            print!("  mov rsp, rbp\n");
+            print!("  pop rbp\n");
+
+            print!("  ret\n");
+        }
     }
 
     fn gen_stmt(&mut self, node: &Node, mut top: usize) -> usize {

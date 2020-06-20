@@ -12,7 +12,8 @@ pub enum Type {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node<'a> {
-    Program(Box<Function<'a>>, Token<'a>),
+    Program(Box<Program<'a>>, Token<'a>),
+    Function(Box<Function<'a>>, Token<'a>),
     Number(i64, Token<'a>, Type),
     Variable(Rc<RefCell<Variable>>, Token<'a>),
     ExprStmt(Box<Unary<'a>>, Token<'a>),
@@ -47,7 +48,14 @@ pub enum Operator2 {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Function<'a> { 
+pub struct Program<'a> { 
+    pub functions: Vec<Rc<RefCell<Function<'a>>>>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function<'a> {
+    pub ty: Type,
+    pub name: String, 
     pub stmt: Node<'a>,
     pub locals: Vec<Rc<RefCell<Variable>>>,
     pub stack_size: i64,
