@@ -6,4 +6,11 @@ debug:
 	cargo build
 	bash ./test.sh debug
 
-.PHONY: c3 debug
+init:
+	cp ./etc/config ./.git
+
+clean:
+	rm tmp* *.s *.o -f
+	cargo clean
+
+.PHONY: c3 debug init clean
