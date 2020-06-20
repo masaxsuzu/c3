@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{Node, Operator1, Operator2, Program, Function, Variable};
+use crate::ast::{Function, Node, Operator1, Operator2, Program, Variable};
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 const ARGREG: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -20,7 +20,7 @@ impl CodeGenerator {
             compute_offset(&mut function.borrow_mut());
         }
         #[cfg(debug_assertions)]
-        eprintln!("{:?}\n",prog);
+        eprintln!("{:?}\n", prog);
 
         print!(".intel_syntax noprefix\n");
 
@@ -161,13 +161,13 @@ impl CodeGenerator {
             Node::FuncCall(call, _, _) => {
                 let mut n = 0;
                 let mut t = top;
-                
+
                 for arg in call.args.iter() {
                     t = self.gen_expr(arg, t);
                     n += 1;
                 }
 
-                for i in 1..n+1 {
+                for i in 1..n + 1 {
                     t -= 1;
                     print!("  mov {}, {}\n", ARGREG[n - i], REG[t]);
                 }

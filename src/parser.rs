@@ -1,6 +1,6 @@
 use crate::ast::{
-    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Function, Program, Type, Unary, FunctionType, ParameterType,
-    Variable,
+    Binary, Block, For, Function, FunctionCall, FunctionType, If, Node, Operator1, Operator2,
+    ParameterType, Program, Type, Unary, Variable,
 };
 use crate::error::Error;
 use crate::token::Token;
@@ -83,7 +83,7 @@ impl<'a> Parser {
 
     // parse = func*
     pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
-        let mut functions: Vec<Rc<RefCell<Function>>> = vec!();
+        let mut functions: Vec<Rc<RefCell<Function>>> = vec![];
 
         loop {
             if let Token::Eof(_) = p.peek(0) {
@@ -95,7 +95,7 @@ impl<'a> Parser {
             functions.push(Rc::new(RefCell::new(func)));
         }
 
-        Ok(Program {functions})
+        Ok(Program { functions })
     }
 
     // func = "typespec" "declarator" compound_stmt
@@ -115,7 +115,10 @@ impl<'a> Parser {
             }
             (ty, f.name)
         } else {
-            return Err(Error::ParseError("Not function name".to_owned(), p.peek(0).clone()));
+            return Err(Error::ParseError(
+                "Not function name".to_owned(),
+                p.peek(0).clone(),
+            ));
         };
         let (p, _) = p.take("{")?;
 
@@ -480,7 +483,7 @@ impl<'a> Parser {
         let x = if let Token::Identifier(x, _) = p.peek(0) {
             *x
         } else {
-            return Err(Error::ParseError("not identifier".to_owned(),t));
+            return Err(Error::ParseError("not identifier".to_owned(), t));
         };
 
         let mut args = Vec::<Node>::new();
@@ -498,7 +501,7 @@ impl<'a> Parser {
                     break;
                 }
             }
-            p = p1;    
+            p = p1;
         }
         let call = Node::FuncCall(
             Box::new(FunctionCall {
@@ -557,7 +560,11 @@ impl<'a> Parser {
     }
 
     // declarator = "*"* ident
-    fn declarator(&self, mut p: Tokens<'a>, ty: Type) -> Result<(Tokens<'a>, (Type, String)), Error<'a>> {
+    fn declarator(
+        &self,
+        mut p: Tokens<'a>,
+        ty: Type,
+    ) -> Result<(Tokens<'a>, (Type, String)), Error<'a>> {
         let mut t = ty;
         while let Ok((p1, _)) = p.consume(0).take("*") {
             t = Type::Pointer(Box::new(t));
@@ -574,41 +581,49 @@ impl<'a> Parser {
     }
 
     // type-suffix = ("(" func-params)?
-    fn type_suffix(&self, p: Tokens<'a>, ty: Type, name: &str) -> Result<(Tokens<'a>, Type), Error<'a>> {
-        let (p, ty) = if let Ok((p,_ )) = p.consume(1).take("(") {
-            let mut after_second: Option<()> = None; 
+    fn type_suffix(
+        &self,
+        p: Tokens<'a>,
+        ty: Type,
+        name: &str,
+    ) -> Result<(Tokens<'a>, Type), Error<'a>> {
+        let (p, ty) = if let Ok((p, _)) = p.consume(1).take("(") {
+            let mut after_second: Option<()> = None;
             let mut p = p;
             let mut params: Vec<ParameterType> = vec![];
             loop {
                 if let Ok((p, _)) = p.take(")") {
-                    return Ok((p, Type::Function(Box::new(FunctionType {
-                        name: name.to_owned(),
-                        return_ty: ty,
-                        params: params,
-                    }))));
+                    return Ok((
+                        p,
+                        Type::Function(Box::new(FunctionType {
+                            name: name.to_owned(),
+                            return_ty: ty,
+                            params: params,
+                        })),
+                    ));
                 }
-                
+
                 p = if let Some(_) = after_second {
-                    let (p, _ ) = p.consume(0).take(",")?;
+                    let (p, _) = p.consume(0).take(",")?;
                     p
                 } else {
                     after_second = Some(());
                     p
-                }; 
+                };
 
                 let (p1, basety) = self.typespec(p)?;
-                let (p1, (basety, name )) = self.declarator(p1, basety)?;
+                let (p1, (basety, name)) = self.declarator(p1, basety)?;
                 p = p1.consume(1);
                 params.push(ParameterType {
                     name: name,
-                    ty : basety,
+                    ty: basety,
                 });
             }
         } else {
             (p, ty)
         };
         Ok((p, ty))
-      }
+    }
 
     ///
     /// Helper

@@ -50,27 +50,27 @@ pub enum Operator2 {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program<'a> { 
-    pub functions: Vec<Rc<RefCell<Function<'a>>>>
+pub struct Program<'a> {
+    pub functions: Vec<Rc<RefCell<Function<'a>>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FunctionType{
+pub struct FunctionType {
     pub return_ty: Type,
-    pub name: String, 
+    pub name: String,
     pub params: Vec<ParameterType>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ParameterType{
+pub struct ParameterType {
     pub ty: Type,
-    pub name: String, 
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function<'a> {
     pub ty: Type,
-    pub name: String, 
+    pub name: String,
     pub stmt: Node<'a>,
     pub params: Vec<Rc<RefCell<Variable>>>,
     pub locals: Vec<Rc<RefCell<Variable>>>,
