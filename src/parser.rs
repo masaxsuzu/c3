@@ -89,6 +89,7 @@ impl<'a> Parser {
             if let Token::Eof(_) = p.peek(0) {
                 break;
             }
+            self.locals = vec![];
             let (p1, func) = self.func(p.consume(0))?;
             p = p1;
             functions.push(Rc::new(RefCell::new(func)));
@@ -97,7 +98,7 @@ impl<'a> Parser {
         Ok(Program {functions})
     }
 
-    // func = "typespec" ident "(" ")" stmt
+    // func = "typespec" ident "(" ")" compound_stmt
     fn func(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Function<'a>), Error<'a>> {
         let (p, ty) = self.typespec(p.consume(0))?;
         let name = if let Token::Identifier(x, _) = p.peek(0).clone() {
@@ -110,8 +111,9 @@ impl<'a> Parser {
 
         let (p, _) = p.take("(")?;
         let (p, _) = p.take(")")?;
+        let (p, _) = p.take("{")?;
 
-        let (p, stmt) = self.stmt(p)?;
+        let (p, stmt) = self.compound_stmt(p)?;
 
         let f = Function {
             name: name.to_owned(),

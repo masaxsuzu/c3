@@ -41,7 +41,9 @@ impl CodeGenerator {
             #[cfg(debug_assertions)]
             eprintln!("{:?}", function.stmt);
 
-            self.gen_stmt(&function.stmt, 0, f);
+            let top = self.gen_stmt(&function.stmt, 0, f);
+
+            assert_eq!(0, top);
 
             // Epilogue
             print!(".L.return.{}:\n", function.name);
