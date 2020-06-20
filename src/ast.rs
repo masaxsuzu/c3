@@ -12,7 +12,7 @@ pub enum Type {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node<'a> {
-    Program(Box<Program<'a>>, Token<'a>),
+    Program(Box<Function<'a>>, Token<'a>),
     Number(i64, Token<'a>, Type),
     Variable(Rc<RefCell<Variable>>, Token<'a>),
     ExprStmt(Box<Unary<'a>>, Token<'a>),
@@ -47,7 +47,7 @@ pub enum Operator2 {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program<'a> {
+pub struct Function<'a> { 
     pub stmt: Node<'a>,
     pub locals: Vec<Rc<RefCell<Variable>>>,
     pub stack_size: i64,

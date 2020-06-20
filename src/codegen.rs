@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{Node, Operator1, Operator2, Program, Variable};
+use crate::ast::{Node, Operator1, Operator2, Function, Variable};
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 const ARGREG: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -15,8 +15,8 @@ impl CodeGenerator {
         CodeGenerator { label_seq: 0 }
     }
 
-    pub fn gen(&mut self, mut program: Program) {
-        compute_offset(&mut program);
+    pub fn gen(&mut self, mut function: Function) {
+        compute_offset(&mut function);
 
         // eprintln!("{:?}\n",program);
 
@@ -27,16 +27,16 @@ impl CodeGenerator {
         // Prologue. r12-15 are callee-saved registers.
         print!("  push rbp\n");
         print!("  mov rbp, rsp\n");
-        print!("  sub rsp, {}\n", program.stack_size);
+        print!("  sub rsp, {}\n", function.stack_size);
         print!("  mov [rbp-8], r12\n");
         print!("  mov [rbp-16], r13\n");
         print!("  mov [rbp-24], r14\n");
         print!("  mov [rbp-32], r15\n");
 
         #[cfg(debug_assertions)]
-        eprintln!("{:?}", program.stmt);
+        eprintln!("{:?}", function.stmt);
 
-        self.gen_stmt(&program.stmt, 0);
+        self.gen_stmt(&function.stmt, 0);
 
         // Epilogue
         print!(".L.return:\n");
@@ -242,13 +242,13 @@ impl CodeGenerator {
     }
 }
 
-fn compute_offset(program: &mut Program) {
+fn compute_offset(func: &mut Function) {
     let mut offset = 32;
-    for local in program.locals.iter() {
+    for local in func.locals.iter() {
         offset += 8;
         local.borrow_mut().offset = offset;
     }
-    program.stack_size = align_to(offset, 16);
+    func.stack_size = align_to(offset, 16);
 }
 
 fn align_to(n: i64, align: i64) -> i64 {

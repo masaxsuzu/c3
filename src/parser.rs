@@ -1,5 +1,5 @@
 use crate::ast::{
-    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Program, Type, Unary,
+    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Function, Type, Unary,
     Variable,
 };
 use crate::error::Error;
@@ -81,10 +81,10 @@ impl<'a> Parser {
     /// Parse Nodes
     ///
 
-    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
+    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Function<'a>, Error<'a>> {
         let (_, n) = self.stmt(p)?;
 
-        Ok(Program {
+        Ok(Function {
             stmt: n,
             locals: self.locals.clone(),
             stack_size: 0,
