@@ -19,7 +19,8 @@ impl CodeGenerator {
         for function in prog.functions.iter_mut() {
             compute_offset(&mut function.borrow_mut());
         }
-        // eprintln!("{:?}\n",program);
+        #[cfg(debug_assertions)]
+        eprintln!("{:?}\n",prog);
 
         print!(".intel_syntax noprefix\n");
 
@@ -38,8 +39,12 @@ impl CodeGenerator {
             print!("  mov [rbp-24], r14\n");
             print!("  mov [rbp-32], r15\n");
 
-            #[cfg(debug_assertions)]
-            eprintln!("{:?}", function.stmt);
+            // Save arguments to the stack
+            let mut i = function.params.len();
+            for var in function.params.iter() {
+                i = i - 1;
+                print!("  mov [rbp-{}], {}\n", var.borrow().offset, ARGREG[i]);
+            }
 
             let top = self.gen_stmt(&function.stmt, 0, f);
 
@@ -170,9 +175,9 @@ impl CodeGenerator {
                 print!("  push r10\n");
                 print!("  push r11\n");
                 print!("  mov rax, 0\n");
-                print!("  push r11\n");
-                print!("  push r10\n");
                 print!("  call {}\n", call.name);
+                print!("  pop r11\n");
+                print!("  pop r10\n");
                 print!("  mov {}, rax\n", REG[t]);
                 return t + 1;
             }
@@ -209,22 +214,22 @@ impl CodeGenerator {
                     Operator2::Eq => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  sete al\n");
-                        print!("  movzb {}, al\n", rd);
+                        print!("  movzx {}, al\n", rd);
                     }
                     Operator2::Ne => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  setne al\n");
-                        print!("  movzb {}, al\n", rd);
+                        print!("  movzx {}, al\n", rd);
                     }
                     Operator2::Lt => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  setl al\n");
-                        print!("  movzb {}, al\n", rd);
+                        print!("  movzx {}, al\n", rd);
                     }
                     Operator2::Le => {
                         print!("  cmp {}, {}\n", rd, rs);
                         print!("  setle al\n");
-                        print!("  movzb {}, al\n", rd);
+                        print!("  movzx {}, al\n", rd);
                     }
                 }
                 return top - 1;

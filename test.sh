@@ -115,5 +115,10 @@ assert $build 2 'int main() { return sub(5, 3); }'
 assert $build 21 'int main() { return add6(1,2,3,4,5,6); }'
 
 assert $build 42 'int retx() { int x = 42; return x; } int main() { return retx();}'
+assert $build 42 'int retx(int x) { return x; } int main() { return retx(42);}'
+assert $build 3 'int s(int x1, int x2, int x3, int x4, int x5, int x6) { return x1 - x2 + x3 - x4 + x5 - x6; } int main() { return s(6,5,4,3,2,1);}'
+assert $build 7 'int main() { return add2(3,4); } int add2(int x, int y) { return x+y; }'
+assert $build 1 'int main() { return sub2(4,3); } int sub2(int x, int y) { return x-y; }'
+assert $build 55 'int main() { return fib(9); } int fib(int x) { if (x<=1) return 1; return fib(x-1) + fib(x-2); }'
 
 echo OK

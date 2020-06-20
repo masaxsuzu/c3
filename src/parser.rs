@@ -1,5 +1,5 @@
 use crate::ast::{
-    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Function, Program, Type, Unary,
+    Binary, Block, For, FunctionCall, If, Node, Operator1, Operator2, Function, Program, Type, Unary, FunctionType, ParameterType,
     Variable,
 };
 use crate::error::Error;
@@ -101,9 +101,19 @@ impl<'a> Parser {
     // func = "typespec" "declarator" compound_stmt
     fn func(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Function<'a>), Error<'a>> {
         let (p, ty) = self.typespec(p.consume(0))?;
-        let (p, ty) = self.declarator(p.consume(0), ty)?;
-        let (ty, name) = if let Type::Function(_, name) = ty.clone() {
-            (ty, name)
+        let (p, (ty, _)) = self.declarator(p.consume(0), ty)?;
+        let mut params: Vec<Rc<RefCell<Variable>>> = vec![];
+        let (ty, name) = if let Type::Function(f) = ty.clone() {
+            for param in f.params.iter() {
+                let var = Rc::new(RefCell::new(Variable {
+                    name: param.clone().name,
+                    offset: 0,
+                    ty: param.clone().ty,
+                }));
+                self.locals.insert(0, var.clone());
+                params.insert(0, var.clone())
+            }
+            (ty, f.name)
         } else {
             return Err(Error::ParseError("Not function name".to_owned(), p.peek(0).clone()));
         };
@@ -116,6 +126,7 @@ impl<'a> Parser {
             ty: ty,
             stmt: stmt,
             locals: self.locals.clone(),
+            params: params,
             stack_size: 0,
         };
 
@@ -241,7 +252,7 @@ impl<'a> Parser {
                 after_second = Some(());
             }
 
-            let (p3, ty) = self.declarator(p.consume(0), ty.clone())?;
+            let (p3, (ty, _)) = self.declarator(p.consume(0), ty.clone())?;
             let (var, name) = if let Token::Identifier(x, _) = p3.peek(0).clone() {
                 let v = Rc::new(RefCell::new(Variable {
                     name: x.to_string(),
@@ -546,7 +557,7 @@ impl<'a> Parser {
     }
 
     // declarator = "*"* ident
-    fn declarator(&self, mut p: Tokens<'a>, ty: Type) -> Result<(Tokens<'a>, Type), Error<'a>> {
+    fn declarator(&self, mut p: Tokens<'a>, ty: Type) -> Result<(Tokens<'a>, (Type, String)), Error<'a>> {
         let mut t = ty;
         while let Ok((p1, _)) = p.consume(0).take("*") {
             t = Type::Pointer(Box::new(t));
@@ -554,7 +565,7 @@ impl<'a> Parser {
         }
         if let Token::Identifier(name, _) = p.peek(0) {
             let (p, t) = self.type_suffix(p.consume(0), t, name)?;
-            return Ok((p.consume(0), t));
+            return Ok((p.consume(0), (t, name.to_string())));
         }
         Err(Error::ParseError(
             "Not identifier".to_string(),
@@ -565,8 +576,34 @@ impl<'a> Parser {
     // type-suffix = ("(" func-params)?
     fn type_suffix(&self, p: Tokens<'a>, ty: Type, name: &str) -> Result<(Tokens<'a>, Type), Error<'a>> {
         let (p, ty) = if let Ok((p,_ )) = p.consume(1).take("(") {
-            let (p, _) = p.take(")")?;
-            (p, Type::Function(Box::new(ty), name.to_string()))
+            let mut after_second: Option<()> = None; 
+            let mut p = p;
+            let mut params: Vec<ParameterType> = vec![];
+            loop {
+                if let Ok((p, _)) = p.take(")") {
+                    return Ok((p, Type::Function(Box::new(FunctionType {
+                        name: name.to_owned(),
+                        return_ty: ty,
+                        params: params,
+                    }))));
+                }
+                
+                p = if let Some(_) = after_second {
+                    let (p, _ ) = p.consume(0).take(",")?;
+                    p
+                } else {
+                    after_second = Some(());
+                    p
+                }; 
+
+                let (p1, basety) = self.typespec(p)?;
+                let (p1, (basety, name )) = self.declarator(p1, basety)?;
+                p = p1.consume(1);
+                params.push(ParameterType {
+                    name: name,
+                    ty : basety,
+                });
+            }
         } else {
             (p, ty)
         };
