@@ -114,4 +114,6 @@ assert $build 8 'int main() { return add(3, 5); }'
 assert $build 2 'int main() { return sub(5, 3); }'
 assert $build 21 'int main() { return add6(1,2,3,4,5,6); }'
 
+assert $build 42 'int retx() { int x = 42; return x; } int main() { return retx();}'
+
 echo OK

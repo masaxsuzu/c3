@@ -81,12 +81,20 @@ impl<'a> Parser {
     /// Parse Nodes
     ///
 
-    pub fn parse(&mut self, p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
-        let (_, func) = self.func(p)?;
+    // parse = func*
+    pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
+        let mut functions: Vec<Rc<RefCell<Function>>> = vec!();
 
-        Ok(Program {
-            functions: vec![Rc::new(RefCell::new(func))],
-        })
+        loop {
+            if let Token::Eof(_) = p.peek(0) {
+                break;
+            }
+            let (p1, func) = self.func(p.consume(0))?;
+            p = p1;
+            functions.push(Rc::new(RefCell::new(func)));
+        }
+
+        Ok(Program {functions})
     }
 
     // func = "typespec" ident "(" ")" stmt

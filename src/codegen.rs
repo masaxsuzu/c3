@@ -25,6 +25,7 @@ impl CodeGenerator {
 
         for f in prog.functions.iter().as_ref() {
             let function = f.borrow();
+
             print!(".globl {}\n", function.name);
             print!("{}:\n", function.name);
 
@@ -40,10 +41,10 @@ impl CodeGenerator {
             #[cfg(debug_assertions)]
             eprintln!("{:?}", function.stmt);
 
-            self.gen_stmt(&function.stmt, 0);
+            self.gen_stmt(&function.stmt, 0, f);
 
             // Epilogue
-            print!(".L.return:\n");
+            print!(".L.return.{}:\n", function.name);
             print!("  mov r12, [rbp-8]\n");
             print!("  mov r13, [rbp-16]\n");
             print!("  mov r14, [rbp-24]\n");
@@ -55,11 +56,11 @@ impl CodeGenerator {
         }
     }
 
-    fn gen_stmt(&mut self, node: &Node, mut top: usize) -> usize {
+    fn gen_stmt(&mut self, node: &Node, mut top: usize, function: &Rc<RefCell<Function>>) -> usize {
         match node {
             Node::BlockStmt(block, _) => {
                 for stmt in block.nodes.iter() {
-                    top = self.gen_stmt(stmt, top);
+                    top = self.gen_stmt(stmt, top, function);
                 }
                 return top;
             }
@@ -70,7 +71,7 @@ impl CodeGenerator {
             Node::Return(expr, _) => {
                 let top = self.gen_expr(&expr.left, top) - 1;
                 print!("  mov rax, {}\n", REG[top]);
-                print!("  jmp .L.return\n");
+                print!("  jmp .L.return.{}\n", function.borrow().name);
                 return top;
             }
             Node::If(_if, _) => {
@@ -81,17 +82,17 @@ impl CodeGenerator {
                     let top = self.gen_expr(&_if.cond, top) - 1;
                     print!("  cmp %s, {}\n", REG[top]);
                     print!("  je  .L.else.{}\n", seq);
-                    let top = self.gen_stmt(&_if.then, top);
+                    let top = self.gen_stmt(&_if.then, top, function);
                     print!("  jmp .L.end.{}\n", seq);
                     print!(".L.else.{}:\n", seq);
-                    let top = self.gen_stmt(&_if.otherwise, top);
+                    let top = self.gen_stmt(&_if.otherwise, top, function);
                     print!(".L.end.{}:\n", seq);
                     top
                 } else {
                     let top = self.gen_expr(&_if.cond, top) - 1;
                     print!("  cmp {}, 0\n", REG[top]);
                     print!("  je  .L.end.{}\n", seq);
-                    let top = self.gen_stmt(&_if.then, top);
+                    let top = self.gen_stmt(&_if.then, top, function);
                     print!(".L.end.{}:\n", seq);
                     top
                 };
@@ -102,7 +103,7 @@ impl CodeGenerator {
                 let seq = self.label_seq;
 
                 let top = if !is_null(&_for.init) {
-                    self.gen_stmt(&_for.init, top)
+                    self.gen_stmt(&_for.init, top, function)
                 } else {
                     top
                 };
@@ -118,10 +119,10 @@ impl CodeGenerator {
                     top
                 };
 
-                let top = self.gen_stmt(&_for.then, top);
+                let top = self.gen_stmt(&_for.then, top, function);
 
                 let top = if !is_null(&_for.inc) {
-                    self.gen_stmt(&_for.inc, top)
+                    self.gen_stmt(&_for.inc, top, function)
                 } else {
                     top
                 };
