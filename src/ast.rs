@@ -7,7 +7,7 @@ use crate::token::Token;
 pub enum Type {
     Unknown,
     Int,
-    Pointer(Box<Type>), // Pointer to X
+    Pointer(Box<PointerType>), // Pointer to X
     Function(Box<FunctionType>),
     Param(Box<ParameterType>),
 }
@@ -52,6 +52,11 @@ pub enum Operator2 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program<'a> {
     pub functions: Vec<Rc<RefCell<Function<'a>>>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PointerType {
+    pub ty: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -119,4 +124,13 @@ pub struct Unary<'a> {
 pub struct Binary<'a> {
     pub left: Node<'a>,
     pub right: Node<'a>,
+}
+
+pub fn size_of(ty : Type) -> u64 {
+    match ty {
+        Type::Int => 8,
+        Type::Pointer(_) => 8,
+        Type::Param(p) => size_of(p.ty),
+        _ => 0,
+    }
 }

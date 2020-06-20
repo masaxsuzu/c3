@@ -1,6 +1,6 @@
 use crate::ast::{
     Binary, Block, For, Function, FunctionCall, FunctionType, If, Node, Operator1, Operator2,
-    ParameterType, Program, Type, Unary, Variable,
+    ParameterType, PointerType, Program, Type, Unary, Variable,
 };
 use crate::error::Error;
 use crate::token::Token;
@@ -461,7 +461,7 @@ impl<'a> Parser {
                     left,
                     Operator1::Addr,
                     t.clone(),
-                    Type::Pointer(Box::new(ty)),
+                    Type::Pointer(Box::new(PointerType {ty})),
                 ),
             ));
         }
@@ -567,7 +567,7 @@ impl<'a> Parser {
     ) -> Result<(Tokens<'a>, (Type, String)), Error<'a>> {
         let mut t = ty;
         while let Ok((p1, _)) = p.consume(0).take("*") {
-            t = Type::Pointer(Box::new(t));
+            t = Type::Pointer(Box::new(PointerType{ty:t}));
             p = p1;
         }
         if let Token::Identifier(name, _) = p.peek(0) {
@@ -678,7 +678,7 @@ impl<'a> Parser {
                 right,
                 Operator2::Add,
                 t,
-                Type::Pointer(Box::new(Type::Int)),
+                Type::Pointer(Box::new( PointerType {ty : Type::Int })),
             )),
             (Type::Pointer(_), Type::Int) => Ok(Self::new_binary_node(
                 left,
@@ -691,7 +691,7 @@ impl<'a> Parser {
                 ),
                 Operator2::Add,
                 t,
-                Type::Pointer(Box::new(Type::Int)),
+                Type::Pointer(Box::new( PointerType {ty : Type::Int })),
             )),
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
@@ -725,7 +725,7 @@ impl<'a> Parser {
                 ),
                 Operator2::Sub,
                 t,
-                Type::Pointer(Box::new(Type::Int)),
+                Type::Pointer(Box::new( PointerType {ty: Type::Int})),
             )),
             (Type::Pointer(tl), Type::Pointer(_)) => {
                 let node = Self::new_binary_node(
@@ -770,7 +770,7 @@ impl<'a> Parser {
     fn get_base_type(&self, node: Node<'a>, t: Token<'a>) -> Result<Type, Error<'a>> {
         let ty = self.get_type(node)?;
         match ty {
-            Type::Pointer(to) => Ok(*to),
+            Type::Pointer(to) => Ok(to.ty),
             _ => Err(Error::ParseError("Not pointer".to_string(), t)),
         }
     }
