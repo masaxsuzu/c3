@@ -756,11 +756,11 @@ impl<'a> Parser {
                 t,
                 Type::Int,
             )),
-            (Type::Pointer(_), Type::Int) => Ok(Self::new_binary_node(
+            (Type::Pointer(to), Type::Int) => Ok(Self::new_binary_node(
                 left,
                 Self::new_binary_node(
                     right,
-                    Node::Number(8, t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
@@ -769,23 +769,36 @@ impl<'a> Parser {
                 t,
                 Type::Pointer(Box::new(PointerType { ty: Type::Int })),
             )),
-            (Type::Pointer(tl), Type::Pointer(_)) => {
+            (Type::Array(of), Type::Int) => Ok(Self::new_binary_node(
+                left,
+                Self::new_binary_node(
+                    right,
+                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Int),
+                    Operator2::Mul,
+                    t.clone(),
+                    Type::Int,
+                ),
+                Operator2::Sub,
+                t,
+                Type::Array(of),
+            )),
+            (Type::Pointer(to), Type::Pointer(_)) => {
                 let node = Self::new_binary_node(
                     left,
                     right,
                     Operator2::Sub,
                     t.clone(),
-                    Type::Pointer(tl.clone()),
+                    Type::Pointer(to.clone()),
                 );
                 let node = Self::new_binary_node(
                     node,
-                    Node::Number(8, t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
                     Operator2::Div,
                     t.clone(),
-                    Type::Pointer(tl.clone()),
+                    Type::Pointer(to.clone()),
                 );
                 Ok(node)
-            }
+            },
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
     }
