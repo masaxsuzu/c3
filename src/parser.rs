@@ -566,7 +566,7 @@ impl<'a> Parser {
             p = p1;
         }
         if let Token::Identifier(name, _) = p.peek(0) {
-            let (p, t) = self.type_suffix(p.consume(0), t, name)?;
+            let (p, t) = self.type_suffix(p.consume(0), t, name, 1)?;
             return Ok((p.consume(0), (t, name.to_string())));
         }
         Err(Error::ParseError(
@@ -576,18 +576,19 @@ impl<'a> Parser {
     }
 
     // type-suffix = "(" func-params
-    //      | "[" num "]"
+    //      | "[" num "]" type-suffix
     //      | ε
     fn type_suffix(
         &self,
         p: Tokens<'a>,
         ty: Type,
         name: &str,
+        next: usize,
     ) -> Result<(Tokens<'a>, Type), Error<'a>> {
-        if let Ok((p, _)) = p.consume(1).take("(") {
+        if let Ok((p, _)) = p.consume(next).take("(") {
             return self.func_params(p, ty, name);
         }
-        if let Ok((p, _)) = p.consume(1).take("[") {
+        if let Ok((p, _)) = p.consume(next).take("[") {
             let (p, size) = self.num(p)?;
             let len = if let Node::Number(n, _, _) = size {
                 n
@@ -595,9 +596,10 @@ impl<'a> Parser {
                 unreachable!("should be number");
             };
             let (p, _) = p.consume(0).take("]")?;
+            let (p, ty) = self.type_suffix(p, ty, name, 0)?;
             return Ok((p, Type::Array(Box::new(ArrayType { ty, len }))));
         }
-        Ok((p.consume(1).clone(), ty))
+        Ok((p.consume(next).clone(), ty))
     }
 
     // func_params = (param ("," param)*)? ")"
@@ -684,7 +686,7 @@ impl<'a> Parser {
             (Type::Int, Type::Pointer(to)) => Ok(Self::new_binary_node(
                 Self::new_binary_node(
                     left.clone(),
-                    Node::Number(size_of(to.ty), t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
@@ -692,25 +694,25 @@ impl<'a> Parser {
                 right,
                 Operator2::Add,
                 t,
-                Type::Pointer(Box::new(PointerType { ty: Type::Int })),
+                Type::Pointer(to.clone()),
             )),
             (Type::Pointer(to), Type::Int) => Ok(Self::new_binary_node(
                 left.clone(),
                 Self::new_binary_node(
                     right,
-                    Node::Number(size_of(to.ty), t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
                 ),
                 Operator2::Add,
                 t,
-                Type::Pointer(Box::new(PointerType { ty: Type::Int })),
+                Type::Pointer(to),
             )),
             (Type::Int, Type::Array(of)) => Ok(Self::new_binary_node(
                 Self::new_binary_node(
                     left.clone(),
-                    Node::Number(size_of(of.ty), t.clone(), Type::Int),
+                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
@@ -718,26 +720,20 @@ impl<'a> Parser {
                 right,
                 Operator2::Add,
                 t,
-                Type::Array(Box::new(ArrayType {
-                    ty: Type::Int,
-                    len: of.len,
-                })),
+                Type::Array(of),
             )),
             (Type::Array(of), Type::Int) => Ok(Self::new_binary_node(
                 left.clone(),
                 Self::new_binary_node(
                     right,
-                    Node::Number(size_of(of.ty), t.clone(), Type::Int),
+                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
                 ),
                 Operator2::Add,
                 t,
-                Type::Array(Box::new(ArrayType {
-                    ty: Type::Int,
-                    len: of.len,
-                })),
+                Type::Array(of)
             )),
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }

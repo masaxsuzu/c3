@@ -158,7 +158,7 @@ pub fn get_base_type<'a>(node: Node<'a>, t: Token<'a>) -> Result<Type, Error<'a>
     match ty {
         Type::Pointer(to) => Ok(to.ty),
         Type::Array(of) => Ok(of.ty),
-        _ => Err(Error::ParseError("Not pointer".to_string(), t)),
+        _ => Err(Error::ParseError(format!("Not pointer {:?}", ty), t)),
     }
 }
 
