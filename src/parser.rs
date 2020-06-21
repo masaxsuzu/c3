@@ -532,7 +532,7 @@ impl<'a> Parser {
         return Ok((p, call));
     }
 
-    /// primary = "(" expr ")" | ident args? | num
+    /// primary = "(" expr ")" | "sizeof" unary | ident args? | num
     /// args = "(" ")"
     fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
@@ -541,6 +541,14 @@ impl<'a> Parser {
             let (p, _) = p.take(")")?;
             return Ok((p, node));
         }
+
+        if let Ok((p, _)) = p.consume(0).take("sizeof") {
+            let (p, node) = self.unary(p)?;
+            let ty = get_type(&node)?;
+            let n = size_of(ty);
+            return Ok((p.consume(0), Node::Number(n, t, Type::Int)));
+        }
+
         if let Token::Identifier(x, _) = p.peek(0) {
             if let Ok((_, _)) = p.consume(1).take("(") {
                 return self.funccall(p);

@@ -148,4 +148,17 @@ assert $build 3 'int main() { int x[2][3]; int *y=x; y[3]=3; return x[1][0]; }'
 assert $build 4 'int main() { int x[2][3]; int *y=x; y[4]=4; return x[1][1]; }'
 assert $build 5 'int main() { int x[2][3]; int *y=x; y[5]=5; return x[1][2]; }'
 
+assert $build 8 'int main() { int x; return sizeof(x); }'
+assert $build 8 'int main() { int x; return sizeof x; }'
+assert $build 8 'int main() { int *x; return sizeof(x); }'
+assert $build 32 'int main() { int x[4]; return sizeof(x); }'
+assert $build 96 'int main() { int x[3][4]; return sizeof(x); }'
+assert $build 32 'int main() { int x[3][4]; return sizeof(*x); }'
+assert $build 8 'int main() { int x[3][4]; return sizeof(**x); }'
+assert $build 9 'int main() { int x[3][4]; return sizeof(**x) + 1; }'
+assert $build 9 'int main() { int x[3][4]; return sizeof **x + 1; }'
+assert $build 8 'int main() { int x[3][4]; return sizeof(**x + 1); }'
+assert $build 8 'int main() { int x=1; return sizeof(x=2); }'
+assert $build 1 'int main() { int x=1; sizeof(x=2); return x; }'
+
 echo OK

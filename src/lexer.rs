@@ -5,7 +5,7 @@ pub struct Lexer<'a> {
     pos: usize,
     next_pos: usize,
     ch: u8,
-    keywords: [&'a str; 6],
+    keywords: [&'a str; 7],
     two_letter_punctuations: [&'a str; 4],
     one_letter_punctuations: [&'a str; 18],
 }
@@ -17,7 +17,7 @@ impl<'a> Lexer<'a> {
             pos: 0,
             next_pos: 0,
             ch: 0,
-            keywords: ["return", "if", "else", "for", "while", "int"],
+            keywords: ["return", "if", "else", "for", "while", "int", "sizeof"],
             two_letter_punctuations: ["==", "!=", "<=", ">="],
             one_letter_punctuations: [
                 "+", "-", "*", "/", "&", "=", "!", "<", ">", ";", "=", "(", ")", "{", "}", ",",
