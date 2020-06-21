@@ -85,6 +85,7 @@ impl<'a> Parser {
     // parse = func*
     pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
         let mut functions: Vec<Rc<RefCell<Function>>> = vec![];
+        let globals: Vec<Rc<RefCell<Variable>>> = vec![];
 
         loop {
             if let Token::Eof(_) = p.peek(0) {
@@ -96,7 +97,7 @@ impl<'a> Parser {
             functions.push(Rc::new(RefCell::new(func)));
         }
 
-        Ok(Program { functions })
+        Ok(Program { functions, globals })
     }
 
     // func = "typespec" "declarator" compound_stmt
@@ -110,6 +111,7 @@ impl<'a> Parser {
                     name: param.clone().name,
                     offset: 0,
                     ty: param.clone().ty,
+                    is_local: true,
                 }));
                 self.locals.insert(0, var.clone());
                 params.insert(0, var.clone())
@@ -261,6 +263,7 @@ impl<'a> Parser {
                 name: name,
                 offset: 0,
                 ty: ty.clone(),
+                is_local: true,
             }));
 
             p = p3;
@@ -482,11 +485,7 @@ impl<'a> Parser {
                 let (p1, _) = p1.consume(0).take("]")?;
                 let add = self.new_add_node(left, expr, p1.peek(0).clone())?;
                 let base = get_base_type(add.clone(), tok.clone())?;
-                left = Self::new_unary_node(
-                    add,
-                    Operator1::Deref, 
-                    tok.clone(),
-                    base);
+                left = Self::new_unary_node(add, Operator1::Deref, tok.clone(), base);
                 p = p1;
                 continue;
             }
@@ -763,7 +762,7 @@ impl<'a> Parser {
                 ),
                 Operator2::Add,
                 t,
-                Type::Array(of)
+                Type::Array(of),
             )),
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
@@ -828,7 +827,7 @@ impl<'a> Parser {
                     Type::Pointer(to.clone()),
                 );
                 Ok(node)
-            },
+            }
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
     }

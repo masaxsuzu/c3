@@ -53,6 +53,7 @@ pub enum Operator2 {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program<'a> {
+    pub globals: Vec<Rc<RefCell<Variable>>>,
     pub functions: Vec<Rc<RefCell<Function<'a>>>>,
 }
 
@@ -95,6 +96,7 @@ pub struct Variable {
     pub ty: Type,
     pub name: String,
     pub offset: i64,
+    pub is_local: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

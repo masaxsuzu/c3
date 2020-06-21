@@ -27,6 +27,21 @@ impl CodeGenerator {
 
         print!(".intel_syntax noprefix\n");
 
+        &self.emit_data(&prog);
+        &self.emit_test(&prog);
+    }
+
+    fn emit_data(&mut self, prog: &Program) {
+        print!(".data\n");
+        for global in prog.globals.iter().as_ref() {
+            let g = global.borrow();
+            print!("{}:\n", g.clone().name);
+            print!("  .zero {}\n", size_of(g.clone().ty));
+        }
+    }
+
+    fn emit_test(&mut self, prog: &Program) {
+        print!(".text\n");
         for f in prog.functions.iter().as_ref() {
             let function = f.borrow();
 
@@ -254,7 +269,11 @@ impl CodeGenerator {
 
     fn gen_addr_var(&self, var: &Rc<RefCell<Variable>>, top: usize) -> usize {
         let v = var.borrow();
-        print!("  lea {}, [rbp-{}]\n", REG[top], v.offset);
+        if v.is_local {
+            print!("  lea {}, [rbp-{}]\n", REG[top], v.offset);
+        } else {
+            print!("  mov {}, offset {}\n", REG[top], v.name);
+        }
         return top + 1;
     }
 }
