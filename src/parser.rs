@@ -429,7 +429,7 @@ impl<'a> Parser {
     }
 
     /// unary = ("+" | "-" | "*" | "&") unary
-    ///       | primary
+    ///       | postfix
     fn unary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0);
         if let Ok((p, _)) = p.consume(0).take("+") {
@@ -469,7 +469,29 @@ impl<'a> Parser {
                 Self::new_unary_node(left, Operator1::Deref, t.clone(), base),
             ));
         }
-        self.primary(p)
+        self.postfix(p)
+    }
+
+    /// postfix = primary ("[" expr "]")*
+    fn postfix(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
+        let tok = p.consume(0).peek(0).clone();
+        let (mut p, mut left) = self.primary(p)?;
+        loop {
+            if let Ok((p1, _)) = p.consume(0).take("[") {
+                let (p1, expr) = self.expr(p1)?;
+                let (p1, _) = p1.consume(0).take("]")?;
+                let add = self.new_add_node(left, expr, p1.peek(0).clone())?;
+                let base = get_base_type(add.clone(), tok.clone())?;
+                left = Self::new_unary_node(
+                    add,
+                    Operator1::Deref, 
+                    tok.clone(),
+                    base);
+                p = p1;
+                continue;
+            }
+            return Ok((p.consume(0), left));
+        }
     }
 
     /// funcall = ident "(" (assign ("," assign)*)? ")"
