@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{Function, Node, Operator1, Operator2, Program, Variable};
+use crate::ast::{
+    get_type, size_of, Function, Node, Operator1, Operator2, Program, Type, Variable,
+};
+use crate::token::Token;
 
 const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
 const ARGREG: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -156,7 +159,8 @@ impl CodeGenerator {
             }
             Node::Variable(var, _) => {
                 let top = self.gen_addr_var(var, top);
-                return load(top);
+                let ty = &var.borrow().ty;
+                return load(top, &ty);
             }
             Node::FuncCall(call, _, _) => {
                 let mut n = 0;
@@ -186,9 +190,9 @@ impl CodeGenerator {
                 let top = self.gen_addr(&node.left, top);
                 return store(top);
             }
-            Node::Unary(node, Operator1::Deref, _, _) => {
+            Node::Unary(node, Operator1::Deref, _, base) => {
                 let top = self.gen_expr(&node.left, top);
-                let top = load(top);
+                let top = load(top, &base);
                 top
             }
             Node::Unary(node, Operator1::Addr, _, _) => {
@@ -258,7 +262,9 @@ impl CodeGenerator {
 fn compute_offset(func: &mut Function) {
     let mut offset = 32;
     for local in func.locals.iter() {
-        offset += 8;
+        let v = Node::Variable(local.clone(), Token::Eof(0));
+        let ty = get_type(&v).ok().unwrap();
+        offset += size_of(ty);
         local.borrow_mut().offset = offset;
     }
     func.stack_size = align_to(offset, 16);
@@ -268,7 +274,12 @@ fn align_to(n: i64, align: i64) -> i64 {
     return (n + align - 1) & !(align - 1);
 }
 
-fn load(top: usize) -> usize {
+fn load(top: usize, ty: &Type) -> usize {
+    if let Type::Array(_) = ty {
+        // Do no thing for Array
+        // In C, array is regarded as a pointer implicitly.
+        return top;
+    }
     print!("  mov {}, [{}]\n", REG[top - 1], REG[top - 1]);
     top
 }

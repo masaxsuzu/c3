@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::error::Error;
 use crate::token::Token;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +9,7 @@ pub enum Type {
     Unknown,
     Int,
     Pointer(Box<PointerType>), // Pointer to X
+    Array(Box<ArrayType>),     // Array of X
     Function(Box<FunctionType>),
     Param(Box<ParameterType>),
 }
@@ -57,6 +59,12 @@ pub struct Program<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PointerType {
     pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArrayType {
+    pub ty: Type,
+    pub len: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -126,10 +134,39 @@ pub struct Binary<'a> {
     pub right: Node<'a>,
 }
 
-pub fn size_of(ty : Type) -> u64 {
+pub fn get_type<'a>(node: &Node<'a>) -> Result<Type, Error<'a>> {
+    match node {
+        Node::Variable(v, _) => {
+            let t = &v.borrow().ty;
+            Ok(t.clone())
+        }
+        Node::Function(f, _) => {
+            let t = &f.ty;
+            Ok(t.clone())
+        }
+        Node::Assign(_, _, ty) => Ok(ty.clone()),
+        Node::Number(_, _, ty) => Ok(ty.clone()),
+        Node::Unary(_, _, _, ty) => Ok(ty.clone()),
+        Node::Binary(_, _, _, ty) => Ok(ty.clone()),
+        Node::FuncCall(_, _, ty) => Ok(ty.clone()),
+        _ => unreachable!("{:?}", node),
+    }
+}
+
+pub fn get_base_type<'a>(node: Node<'a>, t: Token<'a>) -> Result<Type, Error<'a>> {
+    let ty = get_type(&node)?;
+    match ty {
+        Type::Pointer(to) => Ok(to.ty),
+        Type::Array(of) => Ok(of.ty),
+        _ => Err(Error::ParseError("Not pointer".to_string(), t)),
+    }
+}
+
+pub fn size_of(ty: Type) -> i64 {
     match ty {
         Type::Int => 8,
         Type::Pointer(_) => 8,
+        Type::Array(of) => of.len * size_of(of.ty),
         Type::Param(p) => size_of(p.ty),
         _ => 0,
     }

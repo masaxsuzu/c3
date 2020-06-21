@@ -1,6 +1,7 @@
 use crate::ast::{
-    Binary, Block, For, Function, FunctionCall, FunctionType, If, Node, Operator1, Operator2,
-    ParameterType, PointerType, Program, Type, Unary, Variable,
+    get_base_type, get_type, size_of, ArrayType, Binary, Block, For, Function, FunctionCall,
+    FunctionType, If, Node, Operator1, Operator2, ParameterType, PointerType, Program, Type, Unary,
+    Variable,
 };
 use crate::error::Error;
 use crate::token::Token;
@@ -255,22 +256,16 @@ impl<'a> Parser {
                 after_second = Some(());
             }
 
-            let (p3, (ty, _)) = self.declarator(p.consume(0), ty.clone())?;
-            let (var, name) = if let Token::Identifier(x, _) = p3.peek(0).clone() {
-                let v = Rc::new(RefCell::new(Variable {
-                    name: x.to_string(),
-                    offset: 0,
-                    ty: ty.clone(),
-                }));
-                (v, x)
-            } else {
-                return Err(Error::ParseError(
-                    "Not identifier".to_string(),
-                    p.peek(0).clone(),
-                ));
-            };
-            p = p3.consume(1);
-            self.locals.insert(0, var);
+            let (p3, (ty, name)) = self.declarator(p.consume(0), ty.clone())?;
+            let var = Rc::new(RefCell::new(Variable {
+                name: name,
+                offset: 0,
+                ty: ty.clone(),
+            }));
+
+            p = p3;
+
+            self.locals.insert(0, var.clone());
 
             if let Ok((p4, _)) = p.consume(0).take("=") {
                 p = p4;
@@ -278,8 +273,7 @@ impl<'a> Parser {
                 continue;
             }
 
-            let var = self.find_var(name).unwrap();
-            let left = Node::Variable(var, p.peek(0).clone());
+            let left = Node::Variable(var.clone(), p.peek(0).clone());
 
             let (p5, right) = self.assign(p.consume(0))?;
             p = p5;
@@ -321,8 +315,8 @@ impl<'a> Parser {
         let (p, mut left) = self.equality(p)?;
         if let Ok((p1, _)) = p.consume(0).take("=") {
             let (p1, right) = self.assign(p1)?;
-            let _ = self.get_type(left.clone())?;
-            let tr = self.get_type(right.clone())?;
+            let _ = get_type(&left)?;
+            let tr = get_type(&right)?;
 
             if let Node::Variable(v, _) = left.clone() {
                 let mut var = v.borrow_mut();
@@ -454,21 +448,22 @@ impl<'a> Parser {
         }
         if let Ok((p, _)) = p.consume(0).take("&") {
             let (p, left) = self.unary(p)?;
-            let ty = self.get_type(left.clone())?;
+            let ty = get_type(&left)?;
+            let ty = if let Type::Array(of) = ty { of.ty } else { ty };
             return Ok((
                 p,
                 Self::new_unary_node(
                     left,
                     Operator1::Addr,
                     t.clone(),
-                    Type::Pointer(Box::new(PointerType {ty})),
+                    Type::Pointer(Box::new(PointerType { ty })),
                 ),
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("*") {
             let t = p.peek(0).clone();
             let (p, left) = self.unary(p)?;
-            let base = self.get_base_type(left.clone(), t.clone())?;
+            let base = get_base_type(left.clone(), t.clone())?;
             return Ok((
                 p,
                 Self::new_unary_node(left, Operator1::Deref, t.clone(), base),
@@ -567,7 +562,7 @@ impl<'a> Parser {
     ) -> Result<(Tokens<'a>, (Type, String)), Error<'a>> {
         let mut t = ty;
         while let Ok((p1, _)) = p.consume(0).take("*") {
-            t = Type::Pointer(Box::new(PointerType{ty:t}));
+            t = Type::Pointer(Box::new(PointerType { ty: t }));
             p = p1;
         }
         if let Token::Identifier(name, _) = p.peek(0) {
@@ -580,49 +575,69 @@ impl<'a> Parser {
         ))
     }
 
-    // type-suffix = ("(" func-params)?
+    // type-suffix = "(" func-params
+    //      | "[" num "]"
+    //      | ε
     fn type_suffix(
         &self,
         p: Tokens<'a>,
         ty: Type,
         name: &str,
     ) -> Result<(Tokens<'a>, Type), Error<'a>> {
-        let (p, ty) = if let Ok((p, _)) = p.consume(1).take("(") {
-            let mut after_second: Option<()> = None;
-            let mut p = p;
-            let mut params: Vec<ParameterType> = vec![];
-            loop {
-                if let Ok((p, _)) = p.take(")") {
-                    return Ok((
-                        p,
-                        Type::Function(Box::new(FunctionType {
-                            name: name.to_owned(),
-                            return_ty: ty,
-                            params: params,
-                        })),
-                    ));
-                }
+        if let Ok((p, _)) = p.consume(1).take("(") {
+            return self.func_params(p, ty, name);
+        }
+        if let Ok((p, _)) = p.consume(1).take("[") {
+            let (p, size) = self.num(p)?;
+            let len = if let Node::Number(n, _, _) = size {
+                n
+            } else {
+                unreachable!("should be number");
+            };
+            let (p, _) = p.consume(0).take("]")?;
+            return Ok((p, Type::Array(Box::new(ArrayType { ty, len }))));
+        }
+        Ok((p.consume(1).clone(), ty))
+    }
 
-                p = if let Some(_) = after_second {
-                    let (p, _) = p.consume(0).take(",")?;
-                    p
-                } else {
-                    after_second = Some(());
-                    p
-                };
-
-                let (p1, basety) = self.typespec(p)?;
-                let (p1, (basety, name)) = self.declarator(p1, basety)?;
-                p = p1.consume(1);
-                params.push(ParameterType {
-                    name: name,
-                    ty: basety,
-                });
+    // func_params = (param ("," param)*)? ")"
+    fn func_params(
+        &self,
+        p: Tokens<'a>,
+        ty: Type,
+        name: &str,
+    ) -> Result<(Tokens<'a>, Type), Error<'a>> {
+        let mut after_second: Option<()> = None;
+        let mut p = p;
+        let mut params: Vec<ParameterType> = vec![];
+        loop {
+            if let Ok((p, _)) = p.take(")") {
+                return Ok((
+                    p,
+                    Type::Function(Box::new(FunctionType {
+                        name: name.to_owned(),
+                        return_ty: ty,
+                        params: params,
+                    })),
+                ));
             }
-        } else {
-            (p, ty)
-        };
-        Ok((p, ty))
+
+            p = if let Some(_) = after_second {
+                let (p, _) = p.consume(0).take(",")?;
+                p
+            } else {
+                after_second = Some(());
+                p
+            };
+
+            let (p1, basety) = self.typespec(p)?;
+            let (p1, (basety, name)) = self.declarator(p1, basety)?;
+            p = p1;
+            params.push(ParameterType {
+                name: name,
+                ty: basety,
+            });
+        }
     }
 
     ///
@@ -656,21 +671,20 @@ impl<'a> Parser {
         right: Node<'a>,
         t: Token<'a>,
     ) -> Result<Node<'a>, Error<'a>> {
-        let tl = self.get_type(left.clone())?;
-        let tr = self.get_type(right.clone())?;
-
+        let tl = get_type(&left)?;
+        let tr = get_type(&right)?;
         match (tl, tr) {
             (Type::Int, Type::Int) => Ok(Self::new_binary_node(
                 left,
                 right,
                 Operator2::Add,
-                t,
+                t.clone(),
                 Type::Int,
             )),
-            (Type::Int, Type::Pointer(_)) => Ok(Self::new_binary_node(
+            (Type::Int, Type::Pointer(to)) => Ok(Self::new_binary_node(
                 Self::new_binary_node(
-                    left,
-                    Node::Number(8, t.clone(), Type::Int),
+                    left.clone(),
+                    Node::Number(size_of(to.ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
@@ -678,20 +692,52 @@ impl<'a> Parser {
                 right,
                 Operator2::Add,
                 t,
-                Type::Pointer(Box::new( PointerType {ty : Type::Int })),
+                Type::Pointer(Box::new(PointerType { ty: Type::Int })),
             )),
-            (Type::Pointer(_), Type::Int) => Ok(Self::new_binary_node(
-                left,
+            (Type::Pointer(to), Type::Int) => Ok(Self::new_binary_node(
+                left.clone(),
                 Self::new_binary_node(
                     right,
-                    Node::Number(8, t.clone(), Type::Int),
+                    Node::Number(size_of(to.ty), t.clone(), Type::Int),
                     Operator2::Mul,
                     t.clone(),
                     Type::Int,
                 ),
                 Operator2::Add,
                 t,
-                Type::Pointer(Box::new( PointerType {ty : Type::Int })),
+                Type::Pointer(Box::new(PointerType { ty: Type::Int })),
+            )),
+            (Type::Int, Type::Array(of)) => Ok(Self::new_binary_node(
+                Self::new_binary_node(
+                    left.clone(),
+                    Node::Number(size_of(of.ty), t.clone(), Type::Int),
+                    Operator2::Mul,
+                    t.clone(),
+                    Type::Int,
+                ),
+                right,
+                Operator2::Add,
+                t,
+                Type::Array(Box::new(ArrayType {
+                    ty: Type::Int,
+                    len: of.len,
+                })),
+            )),
+            (Type::Array(of), Type::Int) => Ok(Self::new_binary_node(
+                left.clone(),
+                Self::new_binary_node(
+                    right,
+                    Node::Number(size_of(of.ty), t.clone(), Type::Int),
+                    Operator2::Mul,
+                    t.clone(),
+                    Type::Int,
+                ),
+                Operator2::Add,
+                t,
+                Type::Array(Box::new(ArrayType {
+                    ty: Type::Int,
+                    len: of.len,
+                })),
             )),
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
         }
@@ -703,8 +749,8 @@ impl<'a> Parser {
         right: Node<'a>,
         t: Token<'a>,
     ) -> Result<Node<'a>, Error<'a>> {
-        let tl = self.get_type(left.clone())?;
-        let tr = self.get_type(right.clone())?;
+        let tl = get_type(&left)?;
+        let tr = get_type(&right)?;
 
         match (tl, tr) {
             (Type::Int, Type::Int) => Ok(Self::new_binary_node(
@@ -725,7 +771,7 @@ impl<'a> Parser {
                 ),
                 Operator2::Sub,
                 t,
-                Type::Pointer(Box::new( PointerType {ty: Type::Int})),
+                Type::Pointer(Box::new(PointerType { ty: Type::Int })),
             )),
             (Type::Pointer(tl), Type::Pointer(_)) => {
                 let node = Self::new_binary_node(
@@ -745,33 +791,6 @@ impl<'a> Parser {
                 Ok(node)
             }
             _ => Err(Error::ParseError("invalid operand".to_string(), t)),
-        }
-    }
-
-    fn get_type(&self, node: Node<'a>) -> Result<Type, Error<'a>> {
-        match node {
-            Node::Variable(v, _) => {
-                let t = &v.borrow().ty;
-                Ok(t.clone())
-            }
-            Node::Function(f, _) => {
-                let t = &f.ty;
-                Ok(t.clone())
-            }
-            Node::Assign(_, _, ty) => Ok(ty),
-            Node::Number(_, _, ty) => Ok(ty),
-            Node::Unary(_, _, _, ty) => Ok(ty),
-            Node::Binary(_, _, _, ty) => Ok(ty),
-            Node::FuncCall(_, _, ty) => Ok(ty),
-            _ => unreachable!("{:?}", node),
-        }
-    }
-
-    fn get_base_type(&self, node: Node<'a>, t: Token<'a>) -> Result<Type, Error<'a>> {
-        let ty = self.get_type(node)?;
-        match ty {
-            Type::Pointer(to) => Ok(to.ty),
-            _ => Err(Error::ParseError("Not pointer".to_string(), t)),
         }
     }
 }
