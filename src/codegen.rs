@@ -6,8 +6,9 @@ use crate::ast::{
 };
 use crate::token::Token;
 
-const REG: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
-const ARGREG: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+const REG64: [&'static str; 6] = ["r10", "r11", "r12", "r13", "r14", "r15"];
+const ARGREG08: [&'static str; 6] = ["dil", "sil", "dl", "cl", "r8b", "r9b"];
+const ARGREG64: [&'static str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
 pub struct CodeGenerator {
     label_seq: i64,
@@ -61,7 +62,14 @@ impl CodeGenerator {
             let mut i = function.params.len();
             for var in function.params.iter() {
                 i = i - 1;
-                print!("  mov [rbp-{}], {}\n", var.borrow().offset, ARGREG[i]);
+                match size_of(var.borrow().ty.clone()) {
+                    1 => {
+                        print!("  mov [rbp-{}], {}\n", var.borrow().offset, ARGREG08[i]);
+                    },
+                    _ => {                        
+                        print!("  mov [rbp-{}], {}\n", var.borrow().offset, ARGREG64[i]);
+                    },
+                }
             }
 
             let top = self.gen_stmt(&function.stmt, 0, f);
@@ -95,7 +103,7 @@ impl CodeGenerator {
             }
             Node::Return(expr, _) => {
                 let top = self.gen_expr(&expr.left, top) - 1;
-                print!("  mov rax, {}\n", REG[top]);
+                print!("  mov rax, {}\n", REG64[top]);
                 print!("  jmp .L.return.{}\n", function.borrow().name);
                 return top;
             }
@@ -105,7 +113,7 @@ impl CodeGenerator {
 
                 let top = if !is_null(&_if.otherwise) {
                     let top = self.gen_expr(&_if.cond, top) - 1;
-                    print!("  cmp %s, {}\n", REG[top]);
+                    print!("  cmp %s, {}\n", REG64[top]);
                     print!("  je  .L.else.{}\n", seq);
                     let top = self.gen_stmt(&_if.then, top, function);
                     print!("  jmp .L.end.{}\n", seq);
@@ -115,7 +123,7 @@ impl CodeGenerator {
                     top
                 } else {
                     let top = self.gen_expr(&_if.cond, top) - 1;
-                    print!("  cmp {}, 0\n", REG[top]);
+                    print!("  cmp {}, 0\n", REG64[top]);
                     print!("  je  .L.end.{}\n", seq);
                     let top = self.gen_stmt(&_if.then, top, function);
                     print!(".L.end.{}:\n", seq);
@@ -137,7 +145,7 @@ impl CodeGenerator {
 
                 let top = if !is_null(&_for.cond) {
                     let top = self.gen_expr(&_for.cond, top) - 1;
-                    print!("  cmp {}, 0\n", REG[top]);
+                    print!("  cmp {}, 0\n", REG64[top]);
                     print!("  je  .L.end.{}\n", seq);
                     top
                 } else {
@@ -169,7 +177,7 @@ impl CodeGenerator {
     fn gen_expr(&self, expr: &Node, top: usize) -> usize {
         match expr {
             Node::Number(i, _, _) => {
-                print!("  mov {}, {}\n", REG[top], i);
+                print!("  mov {}, {}\n", REG64[top], i);
                 return top + 1;
             }
             Node::Variable(var, _) => {
@@ -188,7 +196,7 @@ impl CodeGenerator {
 
                 for i in 1..n + 1 {
                     t -= 1;
-                    print!("  mov {}, {}\n", ARGREG[n - i], REG[t]);
+                    print!("  mov {}, {}\n", ARGREG64[n - i], REG64[t]);
                 }
 
                 print!("  push r10\n");
@@ -197,13 +205,13 @@ impl CodeGenerator {
                 print!("  call {}\n", call.name);
                 print!("  pop r11\n");
                 print!("  pop r10\n");
-                print!("  mov {}, rax\n", REG[t]);
+                print!("  mov {}, rax\n", REG64[t]);
                 return t + 1;
             }
-            Node::Assign(node, _, _) => {
+            Node::Assign(node, _, ty) => {
                 let top = self.gen_expr(&node.right, top);
                 let top = self.gen_addr(&node.left, top);
-                return store(top);
+                return store(top, &ty);
             }
             Node::Unary(node, Operator1::Deref, _, base) => {
                 let top = self.gen_expr(&node.left, top);
@@ -218,8 +226,8 @@ impl CodeGenerator {
                 let top = self.gen_expr(&node.left, top);
                 let top = self.gen_expr(&node.right, top);
 
-                let rd = REG[top - 2];
-                let rs = REG[top - 1];
+                let rd = REG64[top - 2];
+                let rs = REG64[top - 1];
                 match op {
                     Operator2::Add => print!("  add {}, {}\n", rd, rs),
                     Operator2::Sub => print!("  sub {}, {}\n", rd, rs),
@@ -270,9 +278,9 @@ impl CodeGenerator {
     fn gen_addr_var(&self, var: &Rc<RefCell<Variable>>, top: usize) -> usize {
         let v = var.borrow();
         if v.is_local {
-            print!("  lea {}, [rbp-{}]\n", REG[top], v.offset);
+            print!("  lea {}, [rbp-{}]\n", REG64[top], v.offset);
         } else {
-            print!("  mov {}, offset {}\n", REG[top], v.name);
+            print!("  mov {}, offset {}\n", REG64[top], v.name);
         }
         return top + 1;
     }
@@ -299,12 +307,19 @@ fn load(top: usize, ty: &Type) -> usize {
         // In C, array is regarded as a pointer implicitly.
         return top;
     }
-    print!("  mov {}, [{}]\n", REG[top - 1], REG[top - 1]);
+    print!("  mov {}, [{}]\n", REG64[top - 1], REG64[top - 1]);
     top
 }
 
-fn store(top: usize) -> usize {
-    print!("  mov [{}], {}\n", REG[top - 1], REG[top - 2]);
+fn store(top: usize, ty: &Type) -> usize {
+    match size_of(ty.clone()) {
+        1 => {
+            print!("  mov [{}], {}\n", REG64[top - 1], REG64[top - 2]);
+        },
+        _ => {
+            print!("  mov [{}], {}\n", REG64[top - 1], REG64[top - 2]);
+        },
+    }
     top - 1
 }
 

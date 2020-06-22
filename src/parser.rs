@@ -99,15 +99,13 @@ impl<'a> Parser {
                 break;
             }
             self.locals = vec![];
-
-            let (p1, ty) = self.typespec(p.consume(0))?;
-            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;
-
-            if let Ok((p2, func)) = self.func(p.consume(0)) {
+            if let Ok((p1, func)) = self.func(p.consume(0)) {
                 functions.push(Rc::new(RefCell::new(func)));
-                p = p2;
+                p = p1;
                 continue;
             }
+            let (p1, ty) = self.typespec(p.consume(0))?;
+            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;            
 
             loop {
                 let var = Rc::new(RefCell::new(Variable {
@@ -326,7 +324,7 @@ impl<'a> Parser {
                 p = p1;
                 break;
             }
-            let (p2, n) = if let Ok((_, _)) = p.consume(0).take("int") {
+            let (p2, n) = if let Ok((_,_)) = self.typename(p.consume(0)) {
                 self.declaration(p)?
             } else {
                 self.stmt(p.consume(0))?
@@ -608,8 +606,22 @@ impl<'a> Parser {
     /// Parse type
     ///
 
-    // typespec = "int"
+    // typename = "char" | "int"
+    
+    fn typename(&self, p: Tokens<'a>) ->  Result<(Tokens<'a>, Node<'a>), Error<'a>> {
+        if let Ok((p, t)) = p.consume(0).take("char") {
+            return Ok((p, t));
+        }
+        if let Ok((p, t)) = p.consume(0).take("int") {
+            return Ok((p, t));
+        }
+        return Err(Error::ParseError("not type name".to_owned(), p.consume(0).peek(0).clone()));
+    }
+    
     fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>> {
+        if let Ok((p, _)) = p.consume(0).take("char") {
+            return Ok((p, Type::Char));
+        }
         let (p, _) = p.consume(0).take("int")?;
         Ok((p, Type::Int))
     }

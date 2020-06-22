@@ -8,6 +8,7 @@ use crate::token::Token;
 pub enum Type {
     Unknown,
     Int,
+    Char,
     Pointer(Box<PointerType>), // Pointer to X
     Array(Box<ArrayType>),     // Array of X
     Function(Box<FunctionType>),
@@ -166,6 +167,7 @@ pub fn get_base_type<'a>(node: Node<'a>, t: Token<'a>) -> Result<Type, Error<'a>
 
 pub fn size_of(ty: Type) -> i64 {
     match ty {
+        Type::Char => 1,
         Type::Int => 8,
         Type::Pointer(_) => 8,
         Type::Array(of) => of.len * size_of(of.ty),
