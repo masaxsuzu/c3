@@ -4,6 +4,8 @@ pub enum Token<'a> {
     Eof(usize),
 
     Number(i64, usize),
+    Str(&'a str, usize),
+    
     Identifier(&'a str, usize),
 
     Reserved(&'a str, usize),

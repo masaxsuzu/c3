@@ -30,6 +30,7 @@ fn main() {
                 Token::Identifier(_, p) => p,
                 Token::Illegal(_, p) => p,
                 Token::Number(_, p) => p,
+                Token::Str(_, p) => p,
                 Token::Reserved(_, p) => p,
             };
             eprintln!(

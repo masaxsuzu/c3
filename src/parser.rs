@@ -113,6 +113,7 @@ impl<'a> Parser {
                     offset: 0,
                     ty: ty.clone(),
                     is_local: false,
+                    init_data: None,
                 }));
                 self.globals.insert(0, var.clone());
                 if let Ok((p1, _)) = p1.take(";") {
@@ -141,6 +142,7 @@ impl<'a> Parser {
                     offset: 0,
                     ty: param.clone().ty,
                     is_local: true,
+                    init_data: None,
                 }));
                 self.locals.insert(0, var.clone());
                 params.insert(0, var.clone())
@@ -293,6 +295,7 @@ impl<'a> Parser {
                 offset: 0,
                 ty: ty.clone(),
                 is_local: true,
+                init_data: None,
             }));
 
             p = p3;
@@ -560,7 +563,7 @@ impl<'a> Parser {
         return Ok((p, call));
     }
 
-    /// primary = "(" expr ")" | "sizeof" unary | ident args? | num
+    /// primary = "(" expr ")" | "sizeof" unary | ident args? | num | str
     /// args = "(" ")"
     fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
@@ -590,6 +593,24 @@ impl<'a> Parser {
                 ));
             };
             return Ok((p.consume(1), Node::Variable(var, t)));
+        }
+
+        if let Token::Str(s, _) = p.peek(0) {
+            let tok = p.peek(0);
+            let v = Variable {
+                ty: Type::Array(Box::new(ArrayType {
+                    ty: Type::Integer(1),
+                    len: 1 + s.len() as i64,
+                })),
+                name: format!(".L.data.{}", self.globals.len()),
+                is_local : false,
+                offset: 0,
+                init_data: Some(s.to_string()),
+            };
+            let var = Rc::new(RefCell::new(v));
+            self.globals.insert(0, var.clone());
+
+            return Ok((p.consume(1), Node::Variable(var.clone(), tok.clone())));
         }
         self.num(p)
     }

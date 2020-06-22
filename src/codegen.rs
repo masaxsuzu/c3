@@ -29,7 +29,7 @@ impl CodeGenerator {
         print!(".intel_syntax noprefix\n");
 
         &self.emit_data(&prog);
-        &self.emit_test(&prog);
+        &self.emit_text(&prog);
     }
 
     fn emit_data(&mut self, prog: &Program) {
@@ -37,11 +37,17 @@ impl CodeGenerator {
         for global in prog.globals.iter().as_ref() {
             let g = global.borrow();
             print!("{}:\n", g.clone().name);
-            print!("  .zero {}\n", size_of(g.clone().ty));
+            if let Some(x) = &g.init_data {
+                for e in x.chars() {
+                    print!("  .byte {}\n", e as u32);                    
+                }
+            } else {
+                print!("  .zero {}\n", size_of(g.clone().ty));
+            }
         }
     }
 
-    fn emit_test(&mut self, prog: &Program) {
+    fn emit_text(&mut self, prog: &Program) {
         print!(".text\n");
         for f in prog.functions.iter().as_ref() {
             let function = f.borrow();

@@ -19,6 +19,7 @@ pub enum Node<'a> {
     Program(Box<Program<'a>>, Token<'a>),
     Function(Box<Function<'a>>, Token<'a>),
     Number(i64, Token<'a>, Type),
+    Str(String, Token<'a>, Type),
     Variable(Rc<RefCell<Variable>>, Token<'a>),
     ExprStmt(Box<Unary<'a>>, Token<'a>),
     BlockStmt(Box<Block<'a>>, Token<'a>),
@@ -97,6 +98,7 @@ pub struct Variable {
     pub name: String,
     pub offset: i64,
     pub is_local: bool,
+    pub init_data: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

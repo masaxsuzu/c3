@@ -181,4 +181,10 @@ assert $build 10 'int main() { char x[10]; return sizeof(x); }'
 assert $build 7 'int sub_char(char a, char b, char c) { return a; } int main() { return sub_char(7, 3, 3); }'
 assert $build 1 'int sub_char(char a, char b, char c) { return a-b-c; } int main() { return sub_char(7, 3, 3); }'
 
+assert $build 97 'int main() { return "abc"[0]; }'
+assert $build 98 'int main() { return "abc"[1]; }'
+assert $build 99 'int main() { return "abc"[2]; }'
+assert $build 0 'int main() { return "abc"[3]; }'
+assert $build 4 'int main() { return sizeof("abc"); }'
+
 echo OK

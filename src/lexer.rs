@@ -35,6 +35,7 @@ impl<'a> Lexer<'a> {
         let token = match self.ch {
             0 => Token::Eof(self.pos),
             b'0'..=b'9' => self.consume_number(),
+            b'\"' => self.consume_str(),
             _ => self.consume_keyword(self.ch),
         };
 
@@ -59,6 +60,26 @@ impl<'a> Lexer<'a> {
             Some(n) => Token::Number(n, self.pos),
             None => Token::Illegal(self.ch, self.pos),
         }
+    }
+
+    fn consume_str(&mut self) -> Token<'a> {
+        self.read_char();
+        let start_pos = self.pos;
+        loop {
+            match self.ch {
+                b'\"' => break,
+                _ => self.read_char(),
+            }
+        }
+
+        let consumed = match self.ch {
+            0 => &self.input[start_pos..self.pos + 1],
+            _ => &self.input[start_pos..self.pos],
+        };
+
+        self.read_char();
+
+        Token::Str(consumed, self.pos)
     }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
