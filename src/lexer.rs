@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::token::Token;
 
 pub struct Lexer<'a> {
@@ -30,16 +31,16 @@ impl<'a> Lexer<'a> {
         return lexer;
     }
 
-    pub fn next_token(&mut self) -> Token<'a> {
+    pub fn next_token(&mut self) -> Result<Token<'a>, Error> {
         self.skip_whitespace();
         let token = match self.ch {
             0 => Token::Eof(self.pos),
             b'0'..=b'9' => self.consume_number(),
-            b'\"' => self.consume_str(),
+            b'\"' => self.consume_str()?,
             _ => self.consume_keyword(self.ch),
         };
 
-        token
+        Ok(token)
     }
 
     fn consume_number(&mut self) -> Token<'a> {
@@ -62,13 +63,18 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn consume_str(&mut self) -> Token<'a> {
+    fn consume_str(&mut self) -> Result<Token<'a>, Error> {
         self.read_char();
         let start_pos = self.pos;
         loop {
             match self.ch {
                 b'\"' => break,
-                _ => self.read_char(),
+                _ =>  {
+                    if self.pos == self.input.len() - 1 {
+                        return Err(Error::ParseError("unclosed string".to_owned(), Token::Illegal(self.ch, self.pos)));
+                    }
+                    self.read_char()
+                },
             }
         }
 
@@ -79,7 +85,7 @@ impl<'a> Lexer<'a> {
 
         self.read_char();
 
-        Token::Str(consumed, self.pos)
+        Ok(Token::Str(consumed, self.pos))
     }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
@@ -200,12 +206,13 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = Token<'a>;
     fn next(&mut self) -> Option<Token<'a>> {
         match self.next_token() {
-            Token::Eof(_) => None,
-            x => {
+            Ok(Token::Eof(_)) => None,
+            Ok(x) => {
                 #[cfg(debug_assertions)]
                 eprintln!("{:?}", x);
                 Some(x)
             }
+            _ => None,
         }
     }
 }

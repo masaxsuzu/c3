@@ -597,6 +597,8 @@ impl<'a> Parser {
 
         if let Token::Str(s, _) = p.peek(0) {
             let tok = p.peek(0);
+            // NULL is not included in token, then 
+            // append NULL at end.
             let v = Variable {
                 ty: Type::Array(Box::new(ArrayType {
                     ty: Type::Integer(1),
@@ -605,7 +607,7 @@ impl<'a> Parser {
                 name: format!(".L.data.{}", self.globals.len()),
                 is_local : false,
                 offset: 0,
-                init_data: Some(s.to_string()),
+                init_data: Some(format!("{}\0", s.to_string())),
             };
             let var = Rc::new(RefCell::new(v));
             self.globals.insert(0, var.clone());
