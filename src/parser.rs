@@ -62,11 +62,12 @@ impl<'a> Tokens<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parser {
     pub locals: Vec<Rc<RefCell<Variable>>>,
+    pub globals: Vec<Rc<RefCell<Variable>>>,
 }
 
 impl<'a> Parser {
     pub fn new() -> Self {
-        Parser { locals: Vec::new() }
+        Parser { locals: Vec::new(), globals: Vec::new() }
     }
 
     fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
@@ -75,6 +76,13 @@ impl<'a> Parser {
                 return Some(var.clone());
             }
         }
+
+        for var in self.globals.iter() {
+            if var.borrow_mut().name == name {
+                return Some(var.clone());
+            }
+        }
+
         None
     }
 
@@ -85,19 +93,42 @@ impl<'a> Parser {
     // parse = func*
     pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
         let mut functions: Vec<Rc<RefCell<Function>>> = vec![];
-        let globals: Vec<Rc<RefCell<Variable>>> = vec![];
 
         loop {
             if let Token::Eof(_) = p.peek(0) {
                 break;
             }
             self.locals = vec![];
-            let (p1, func) = self.func(p.consume(0))?;
-            p = p1;
-            functions.push(Rc::new(RefCell::new(func)));
-        }
 
-        Ok(Program { functions, globals })
+            let (p1, ty) = self.typespec(p.consume(0))?;
+            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;
+
+            if let Ok((p2, func)) = self.func(p.consume(0)) {
+                functions.push(Rc::new(RefCell::new(func)));
+                p = p2;
+                continue;
+            }
+
+            loop {
+                let var = Rc::new(RefCell::new(Variable {
+                    name: name,
+                    offset: 0,
+                    ty: ty.clone(),
+                    is_local: false,
+                }));
+                self.globals.insert(0, var.clone());
+                if let Ok((p1, _)) = p1.take(";") {
+                    p = p1;
+                    break;
+                }
+                let (p2, _) = p1.take(",")?;
+                let (p2, (ty1, name1)) = self.declarator(p2.consume(0), ty)?;
+                p1 = p2;
+                ty = ty1;
+                name = name1;
+            }
+        }
+        Ok(Program { functions: functions, globals: self.globals.clone() })
     }
 
     // func = "typespec" "declarator" compound_stmt

@@ -17,11 +17,11 @@ assert() {
 
   if [ "$build" = "debug" ]; then
     time cargo run -q -- "$input" > tmp.s || exit
-    cc -o tmp tmp.s tmp2.o
+    cc -static -o tmp tmp.s tmp2.o
     time ./tmp
   else
     cargo run -q --release -- "$input" > tmp.s || exit
-    cc -o tmp tmp.s tmp2.o
+    cc -static -o tmp tmp.s tmp2.o
     ./tmp
   fi
 
@@ -160,5 +160,17 @@ assert $build 9 'int main() { int x[3][4]; return sizeof **x + 1; }'
 assert $build 8 'int main() { int x[3][4]; return sizeof(**x + 1); }'
 assert $build 8 'int main() { int x=1; return sizeof(x=2); }'
 assert $build 1 'int main() { int x=1; sizeof(x=2); return x; }'
+
+assert $build 0 'int x; int main() { return x; }'
+assert $build 3 'int x; int main() { x=3; return x; }'
+assert $build 7 'int x; int y; int main() { x=3; y=4; return x+y; }'
+assert $build 7 'int x, y; int main() { x=3; y=4; return x+y; }'
+assert $build 0 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[0]; }'
+assert $build 1 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[1]; }'
+assert $build 2 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[2]; }'
+assert $build 3 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[3]; }'
+
+assert $build 8 'int x; int main() { return sizeof(x); }'
+assert $build 32 'int x[4]; int main() { return sizeof(x); }'
 
 echo OK
