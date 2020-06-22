@@ -179,6 +179,6 @@ assert $build 2 'int main() { char x=1; char y=2; return y; }'
 assert $build 1 'int main() { char x; return sizeof(x); }'
 assert $build 10 'int main() { char x[10]; return sizeof(x); }'
 assert $build 7 'int sub_char(char a, char b, char c) { return a; } int main() { return sub_char(7, 3, 3); }'
-# assert $build 1 'int sub_char(char a, char b, char c) { return a-b-c; } int main() { return sub_char(7, 3, 3); }'
+assert $build 1 'int sub_char(char a, char b, char c) { return a-b-c; } int main() { return sub_char(7, 3, 3); }'
 
 echo OK

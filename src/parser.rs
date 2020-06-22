@@ -371,13 +371,13 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("==") {
                 let (p1, right) = self.relational(p1)?;
                 p = p1;
-                left = Self::new_binary_node(left, right, Operator2::Eq, t.clone(), Type::Int);
+                left = Self::new_binary_node(left, right, Operator2::Eq, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("!=") {
                 let (p2, right) = self.relational(p2)?;
                 p = p2;
-                left = Self::new_binary_node(left, right, Operator2::Ne, t.clone(), Type::Int);
+                left = Self::new_binary_node(left, right, Operator2::Ne, t.clone(), Type::Integer(8));
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -392,26 +392,26 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("<=") {
                 let (p1, right) = self.add(p1)?;
                 p = p1;
-                left = Self::new_binary_node(left, right, Operator2::Le, t.clone(), Type::Int);
+                left = Self::new_binary_node(left, right, Operator2::Le, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("<") {
                 let (p2, right) = self.add(p2)?;
                 p = p2;
-                left = Self::new_binary_node(left, right, Operator2::Lt, t.clone(), Type::Int);
+                left = Self::new_binary_node(left, right, Operator2::Lt, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p3, _)) = p.consume(0).take(">=") {
                 let (p3, right) = self.add(p3)?;
                 p = p3;
-                left = Self::new_binary_node(right, left, Operator2::Le, t.clone(), Type::Int);
+                left = Self::new_binary_node(right, left, Operator2::Le, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p4, _)) = p.consume(0).take(">") {
                 let t = p.peek(0).clone();
                 let (p4, right) = self.add(p4)?;
                 p = p4;
-                left = Self::new_binary_node(right, left, Operator2::Lt, t.clone(), Type::Int);
+                left = Self::new_binary_node(right, left, Operator2::Lt, t.clone(), Type::Integer(8));
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -447,13 +447,13 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("*") {
                 let (p1, right) = self.unary(p1)?;
                 p = p1;
-                left = Self::new_binary_node(left, right, Operator2::Mul, t.clone(), Type::Int);
+                left = Self::new_binary_node(left, right, Operator2::Mul, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("/") {
                 let (p2, right) = self.unary(p2)?;
                 p = p2;
-                left = Self::new_binary_node(left, right, Operator2::Div, t.clone(), Type::Int);
+                left = Self::new_binary_node(left, right, Operator2::Div, t.clone(), Type::Integer(8));
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -468,14 +468,14 @@ impl<'a> Parser {
             let (p, left) = self.unary(p)?;
             return Ok((
                 p,
-                self.new_add_node(left, Node::Number(0, t.clone(), Type::Int), t.clone())?,
+                self.new_add_node(left, Node::Number(0, t.clone(), Type::Integer(8)), t.clone())?,
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("-") {
             let (p, right) = self.unary(p)?;
             return Ok((
                 p,
-                self.new_sub_node(Node::Number(0, t.clone(), Type::Int), right, t.clone())?,
+                self.new_sub_node(Node::Number(0, t.clone(), Type::Integer(8)), right, t.clone())?,
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("&") {
@@ -554,7 +554,7 @@ impl<'a> Parser {
                 args: args,
             }),
             t.clone(),
-            Type::Int,
+            Type::Integer(8),
         );
         let (p, _) = p.take(")")?;
         return Ok((p, call));
@@ -574,7 +574,7 @@ impl<'a> Parser {
             let (p, node) = self.unary(p)?;
             let ty = get_type(&node)?;
             let n = size_of(ty);
-            return Ok((p.consume(0), Node::Number(n, t, Type::Int)));
+            return Ok((p.consume(0), Node::Number(n, t, Type::Integer(8))));
         }
 
         if let Token::Identifier(x, _) = p.peek(0) {
@@ -597,7 +597,7 @@ impl<'a> Parser {
     fn num(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         if let Token::Number(i, _) = p.peek(0) {
-            return Ok((p.consume(1), Node::Number(*i, t, Type::Int)));
+            return Ok((p.consume(1), Node::Number(*i, t, Type::Integer(8))));
         }
         Err(Error::ParseError(format!("not number"), t.clone()))
     }
@@ -620,10 +620,10 @@ impl<'a> Parser {
     
     fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>> {
         if let Ok((p, _)) = p.consume(0).take("char") {
-            return Ok((p, Type::Char));
+            return Ok((p, Type::Integer(1)));
         }
         let (p, _) = p.consume(0).take("int")?;
-        Ok((p, Type::Int))
+        Ok((p, Type::Integer(8)))
     }
 
     // declarator = "*"* ident
@@ -748,60 +748,60 @@ impl<'a> Parser {
         let tl = get_type(&left)?;
         let tr = get_type(&right)?;
         match (tl, tr) {
-            (Type::Int, Type::Int) => Ok(Self::new_binary_node(
+            (Type::Integer(i), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left,
                 right,
                 Operator2::Add,
                 t.clone(),
-                Type::Int,
+                Type::Integer(i),
             )),
-            (Type::Int, Type::Pointer(to)) => Ok(Self::new_binary_node(
+            (Type::Integer(_), Type::Pointer(to)) => Ok(Self::new_binary_node(
                 Self::new_binary_node(
                     left.clone(),
-                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Mul,
                     t.clone(),
-                    Type::Int,
+                    Type::Integer(8),
                 ),
                 right,
                 Operator2::Add,
                 t,
                 Type::Pointer(to.clone()),
             )),
-            (Type::Pointer(to), Type::Int) => Ok(Self::new_binary_node(
+            (Type::Pointer(to), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left.clone(),
                 Self::new_binary_node(
                     right,
-                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Mul,
                     t.clone(),
-                    Type::Int,
+                    Type::Integer(8),
                 ),
                 Operator2::Add,
                 t,
                 Type::Pointer(to),
             )),
-            (Type::Int, Type::Array(of)) => Ok(Self::new_binary_node(
+            (Type::Integer(_), Type::Array(of)) => Ok(Self::new_binary_node(
                 Self::new_binary_node(
                     left.clone(),
-                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Mul,
                     t.clone(),
-                    Type::Int,
+                    Type::Integer(8),
                 ),
                 right,
                 Operator2::Add,
                 t,
                 Type::Array(of),
             )),
-            (Type::Array(of), Type::Int) => Ok(Self::new_binary_node(
+            (Type::Array(of), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left.clone(),
                 Self::new_binary_node(
                     right,
-                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Mul,
                     t.clone(),
-                    Type::Int,
+                    Type::Integer(8),
                 ),
                 Operator2::Add,
                 t,
@@ -821,34 +821,34 @@ impl<'a> Parser {
         let tr = get_type(&right)?;
 
         match (tl, tr) {
-            (Type::Int, Type::Int) => Ok(Self::new_binary_node(
+            (Type::Integer(_), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left,
                 right,
                 Operator2::Sub,
                 t,
-                Type::Int,
+                Type::Integer(8),
             )),
-            (Type::Pointer(to), Type::Int) => Ok(Self::new_binary_node(
+            (Type::Pointer(to), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left,
                 Self::new_binary_node(
                     right,
-                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Mul,
                     t.clone(),
-                    Type::Int,
+                    Type::Integer(8),
                 ),
                 Operator2::Sub,
                 t,
-                Type::Pointer(Box::new(PointerType { ty: Type::Int })),
+                Type::Pointer(Box::new(PointerType { ty: Type::Integer(8) })),
             )),
-            (Type::Array(of), Type::Int) => Ok(Self::new_binary_node(
+            (Type::Array(of), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left,
                 Self::new_binary_node(
                     right,
-                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(of.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Mul,
                     t.clone(),
-                    Type::Int,
+                    Type::Integer(8),
                 ),
                 Operator2::Sub,
                 t,
@@ -864,7 +864,7 @@ impl<'a> Parser {
                 );
                 let node = Self::new_binary_node(
                     node,
-                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Int),
+                    Node::Number(size_of(to.clone().ty), t.clone(), Type::Integer(8)),
                     Operator2::Div,
                     t.clone(),
                     Type::Pointer(to.clone()),
