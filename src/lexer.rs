@@ -65,28 +65,36 @@ impl<'a> Lexer<'a> {
 
     fn consume_str(&mut self) -> Result<Token<'a>, Error> {
         self.read_char();
-        let start_pos = self.pos;
-        loop {
-            match self.ch {
-                b'\"' => break,
-                _ =>  {
-                    if self.pos == self.input.len() - 1 {
-                        return Err(Error::ParseError("unclosed string".to_owned(), Token::Illegal(self.ch, self.pos)));
-                    }
-                    self.read_char()
-                },
+        let mut escape_next = false;
+        let mut v = Vec::new();
+        for c in self.input[self.pos..].chars() {
+            self.read_char();
+            if c == '"' {
+                return Ok(Token::Str(v.iter().collect(), self.pos));
+            }
+            if escape_next {
+                escape_next = false;
+                v.push(match c {
+                    'a' => 7 as char,
+                    'b' => 8 as char,
+                    't' => 9 as char,
+                    'n' => 10 as char,
+                    'v' => 11 as char,
+                    'f' => 12 as char,
+                    'r' => 13 as char,
+                    'e' => 27 as char,
+                    c => c,
+                });
+            } 
+            else if c == '\\' {
+                    escape_next = true;
+            } 
+            else { 
+                v.push(c);
             }
         }
-
-        let consumed = match self.ch {
-            0 => &self.input[start_pos..self.pos + 1],
-            _ => &self.input[start_pos..self.pos],
-        };
-
-        self.read_char();
-
-        Ok(Token::Str(consumed, self.pos))
-    }
+        return Err(Error::ParseError("unclosed string".to_owned(), Token::Illegal(self.ch, self.pos)));
+        }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
         for keyword in self.keywords.iter() {

@@ -187,4 +187,22 @@ assert $build 99 'int main() { return "abc"[2]; }'
 assert $build 0 'int main() { return "abc"[3]; }'
 assert $build 4 'int main() { return sizeof("abc"); }'
 
+assert $build 7 'int main() { return "\a"[0]; }'
+assert $build 8 'int main() { return "\b"[0]; }'
+assert $build 9 'int main() { return "\t"[0]; }'
+assert $build 10 'int main() { return "\n"[0]; }'
+assert $build 11 'int main() { return "\v"[0]; }'
+assert $build 12 'int main() { return "\f"[0]; }'
+assert $build 13 'int main() { return "\r"[0]; }'
+assert $build 27 'int main() { return "\e"[0]; }'
+
+assert $build 106 'int main() { return "\j"[0]; }'
+assert $build 107 'int main() { return "\k"[0]; }'
+assert $build 108 'int main() { return "\l"[0]; }'
+
+assert $build 7 'int main() { return "\ax\ny"[0]; }'
+assert $build 120 'int main() { return "\ax\ny"[1]; }'
+assert $build 10 'int main() { return "\ax\ny"[2]; }'
+assert $build 121 'int main() { return "\ax\ny"[3]; }'
+
 echo OK
