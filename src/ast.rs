@@ -23,6 +23,7 @@ pub enum Node<'a> {
     Variable(Rc<RefCell<Variable>>, Token<'a>),
     ExprStmt(Box<Unary<'a>>, Token<'a>),
     BlockStmt(Box<Block<'a>>, Token<'a>),
+    StmtExpr(Box<StmtExpr<'a>>, Token<'a>),
     Return(Box<Unary<'a>>, Token<'a>),
     If(Box<If<'a>>, Token<'a>),
     Loop(Box<For<'a>>, Token<'a>),
@@ -113,6 +114,12 @@ pub struct Block<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct StmtExpr<'a> {
+    pub ty: Type,
+    pub nodes: Vec<Node<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct If<'a> {
     pub cond: Node<'a>,
     pub then: Node<'a>,
@@ -142,6 +149,10 @@ pub fn get_type<'a>(node: &Node<'a>) -> Result<Type, Error<'a>> {
     match node {
         Node::Variable(v, _) => {
             let t = &v.borrow().ty;
+            Ok(t.clone())
+        }
+        Node::StmtExpr(stmt, _) => {
+            let t = &stmt.ty;
             Ok(t.clone())
         }
         Node::Function(f, _) => {

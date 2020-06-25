@@ -1,7 +1,7 @@
 use crate::ast::{
     get_base_type, get_type, size_of, ArrayType, Binary, Block, For, Function, FunctionCall,
     FunctionType, If, Node, Operator1, Operator2, ParameterType, PointerType, Program, Type, Unary,
-    Variable,
+    Variable, StmtExpr
 };
 use crate::error::Error;
 use crate::token::Token;
@@ -156,7 +156,13 @@ impl<'a> Parser {
         };
         let (p, _) = p.take("{")?;
 
-        let (p, stmt) = self.compound_stmt(p)?;
+        let (p, stmt) = match self.compound_stmt(p) {
+            Ok((p,s)) => (p, s),
+            Err(e) => {
+                eprintln!("{:?}",e);
+                return Err(e);
+            },
+        };
 
         let f = Function {
             name: name,
@@ -563,10 +569,36 @@ impl<'a> Parser {
         return Ok((p, call));
     }
 
-    /// primary = "(" expr ")" | "sizeof" unary | ident args? | num | str
-    /// args = "(" ")"
+    /// primary = "(" "{" stmt stmt* "}" ")"
+    //         | "(" expr ")"
+    //         | "sizeof" unary
+    //         | ident args?
+    //         | str
+    //         | num
     fn primary(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
+
+        if let (Ok((_, _)), Ok((p, _))) = (p.consume(0).take("("), p.consume(1).take("{")) {
+            let (p, stmt) = self.compound_stmt(p)?;
+            let (body, t) = if let Node::BlockStmt(body, t) = stmt {
+                (body, t)
+            } else {
+                unimplemented!()
+            };
+
+            let last = body.nodes.last();
+            let ty = if let Some(Node::ExprStmt(node, _)) = last {
+                get_type(&node.left)?
+            }
+            else {
+                return Err(Error::ParseError("statement expression returning void is not supported".to_owned(), t));
+            };
+
+            let node = Node::StmtExpr(Box::new(StmtExpr { ty: ty, nodes: body.nodes}) , t);
+            let (p, _) = p.take(")")?;
+            return Ok((p, node));
+        }
+
         if let Ok((p, _)) = p.consume(0).take("(") {
             let (p, node) = self.expr(p)?;
             let (p, _) = p.take(")")?;

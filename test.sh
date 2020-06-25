@@ -205,4 +205,10 @@ assert $build 120 'int main() { return "\ax\ny"[1]; }'
 assert $build 10 'int main() { return "\ax\ny"[2]; }'
 assert $build 121 'int main() { return "\ax\ny"[3]; }'
 
+assert $build 0 'int main() { return ({ 0; }); }'
+assert $build 2 'int main() { return ({ 0; 1; 2; }); }'
+assert $build 1 'int main() { ({ 0; return 1; 2; }); return 3; }'
+assert $build 6 'int main() { return ({ 1; }) + ({ 2; }) + ({ 3; }); }'
+assert $build 3 'int main() { return ({ int x=3; x; }); }'
+
 echo OK
