@@ -35,6 +35,7 @@ fn main() {
         Err(Error::ParseError(msg, token)) => {
             let pos = match token {
                 Token::Eof(p) => p,
+                Token::Comment(_,_, p) => p,
                 Token::Identifier(_, p) => p,
                 Token::Illegal(_, p) => p,
                 Token::Number(_, p) => p,

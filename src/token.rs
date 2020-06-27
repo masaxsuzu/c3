@@ -2,6 +2,7 @@
 pub enum Token<'a> {
     Illegal(u8, usize),
     Eof(usize),
+    Comment(usize, usize, usize),
 
     Number(i64, usize),
     Str(String, usize),
