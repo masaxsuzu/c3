@@ -6,16 +6,24 @@ use c3::parser::{Parser, Tokens};
 use c3::token::Token;
 use std::env;
 use std::rc::Rc;
+use std::fs::read_to_string;
+use std::path::Path;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         panic!("{}: invalid number of arguments", args[0]);
     }
+    let file = if let Ok(f) = read_to_string(Path::new(&args[1])) {
+        f
+    } else {
+        panic!("{}: fail to read", args[1]);
+    };
+
     let tokens = Tokens::new(
-        args[1].len(),
+        file.len(),
         0,
-        Rc::new(Lexer::new(&args[1]).into_iter().collect::<Vec<Token>>()),
+        Rc::new(Lexer::new(&file).into_iter().collect::<Vec<Token>>()),
     );
     let mut parser = Parser::new();
     let mut codegen = CodeGenerator::new();
@@ -35,7 +43,7 @@ fn main() {
             };
             eprintln!(
                 "{}",
-                Error::DisplayError("line".to_string(), args[1].to_string(), pos, msg)
+                Error::DisplayError("line".to_string(), file, pos, msg)
             );
             1
         }

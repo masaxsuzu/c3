@@ -16,11 +16,13 @@ assert() {
   input="$3"
 
   if [ "$build" = "debug" ]; then
-    time cargo run -q -- "$input" > tmp.s || exit
+    echo "$input" > tmp.src
+    time cargo run -q -- tmp.src > tmp.s || exit
     cc -static -o tmp tmp.s tmp2.o
     time ./tmp
   else
-    cargo run -q --release -- "$input" > tmp.s || exit
+    echo "$input" > tmp.src
+    cargo run -q --release -- tmp.src > tmp.s || exit
     cc -static -o tmp tmp.s tmp2.o
     ./tmp
   fi
