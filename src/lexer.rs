@@ -69,7 +69,7 @@ impl<'a> Lexer<'a> {
         let mut v = Vec::new();
         for c in self.input[self.pos..].chars() {
             self.read_char();
-            if c == '"' {
+            if c == '"' && !escape_next {
                 return Ok(Token::Str(v.iter().collect(), self.pos));
             }
             if escape_next {

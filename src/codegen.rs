@@ -320,7 +320,11 @@ fn load(top: usize, ty: &Type) -> usize {
         // In C, array is regarded as a pointer implicitly.
         return top;
     }
-    print!("  mov {}, [{}]\n", REG64[top - 1], REG64[top - 1]);
+    if size_of(ty.clone()) == 1 {
+        print!("  movsx {}, byte ptr [{}]\n", REG64[top - 1], REG64[top - 1]);
+    } else {
+        print!("  mov {}, [{}]\n", REG64[top - 1], REG64[top - 1]);
+    }
     top
 }
 
