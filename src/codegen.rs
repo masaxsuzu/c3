@@ -119,7 +119,7 @@ impl CodeGenerator {
 
                 let top = if !is_null(&_if.otherwise) {
                     let top = self.gen_expr(&_if.cond, top, function) - 1;
-                    print!("  cmp %s, {}\n", REG64[top]);
+                    print!("  cmp {}, 0\n", REG64[top]);
                     print!("  je  .L.else.{}\n", seq);
                     let top = self.gen_stmt(&_if.then, top, function);
                     print!("  jmp .L.end.{}\n", seq);

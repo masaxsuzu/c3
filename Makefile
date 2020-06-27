@@ -1,10 +1,10 @@
 c3:
 	cargo build --release
-	bash ./test.sh release
+	bash ./test.sh release ./tests/test.c
 
 debug:
 	cargo build
-	bash ./test.sh debug
+	bash ./test.sh debug ./tests/test.c
 
 init:
 	cp ./etc/config ./.git
