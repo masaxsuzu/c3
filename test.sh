@@ -44,6 +44,7 @@ assert $build 10 'int main() { return - -10; }'
 assert $build 10 'int main() { return - - +10; }'
 
 assert $build 41 'int main() { return  12 + 34 - 5 ; }'
+assert $build 6 'int main() { return  12/2; }'
 
 assert $build 21 'int main() { return 5+20-4; }'
 

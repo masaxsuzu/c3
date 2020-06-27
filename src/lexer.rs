@@ -37,8 +37,7 @@ impl<'a> Lexer<'a> {
             0 => Token::Eof(self.pos),
             b'0'..=b'9' => self.consume_number(),
             b'\"' => self.consume_str()?,
-            b'/' => self.consume_comment()?,
-            _ => self.consume_keyword(self.ch),
+            _ => self.skip_comment(),
         };
 
         Ok(token)
@@ -142,7 +141,7 @@ impl<'a> Lexer<'a> {
         Token::Illegal(start, self.pos)
     }
 
-    fn consume_comment(&mut self) -> Result<Token<'a>, Error> {
+    fn skip_comment(&mut self) -> Token<'a> {
         let start_pos = self.pos;
         if self.starts_with("//") {
             self.read_n(2);
@@ -151,7 +150,7 @@ impl<'a> Lexer<'a> {
             }
             let end_pos = self.pos;
             self.read_n(1);
-            return Ok(Token::Comment(start_pos, end_pos, self.pos));
+            return Token::Comment(start_pos, end_pos, self.pos)
         }
         if self.starts_with("/*") {
             self.read_n(2);
@@ -160,9 +159,9 @@ impl<'a> Lexer<'a> {
             }
             let end_pos = self.pos;
             self.read_n(2);
-            return Ok(Token::Comment(start_pos, end_pos, self.pos));
+            return Token::Comment(start_pos, end_pos, self.pos);
         }
-        return Err(Error::ParseError("unclosed comment".to_owned(), Token::Illegal(self.ch, self.pos)));
+        self.consume_keyword(self.ch)
     }
 
     fn starts_with(&self, word: &str) -> bool {
