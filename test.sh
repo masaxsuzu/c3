@@ -217,4 +217,8 @@ assert  $build 2 'int main() { /* return 1; */ return 2; }'
 assert  $build 2 'int main() { // return 1;
 return 2; }'
 
+assert $build 2 'int main() { int x=2; { int x=3; } return x; }'
+assert $build 2 'int main() { int x=2; { int x=3; } { int y=4; return x; }}'
+assert $build 3 'int main() { int x=2; { x=3; } return x; }'
+
 echo OK

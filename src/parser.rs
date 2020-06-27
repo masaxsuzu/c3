@@ -63,27 +63,33 @@ impl<'a> Tokens<'a> {
 pub struct Parser {
     pub locals: Vec<Rc<RefCell<Variable>>>,
     pub globals: Vec<Rc<RefCell<Variable>>>,
+    pub var_scopes: Vec<Vec<Rc<RefCell<Variable>>>>,
 }
 
 impl<'a> Parser {
     pub fn new() -> Self {
-        Parser { locals: Vec::new(), globals: Vec::new() }
+        Parser { locals: Vec::new(), globals: Vec::new(), var_scopes: Vec::new(), }
+    }
+
+    fn enter_scope(&mut self) {
+        self.var_scopes.push(Default::default());
+    }
+
+    fn leave_scope(&mut self) {
+        self.var_scopes.pop();
     }
 
     fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
-        for var in self.locals.iter() {
-            if var.borrow_mut().name == name {
-                return Some(var.clone());
-            }
-        }
-
-        for var in self.globals.iter() {
-            if var.borrow_mut().name == name {
-                return Some(var.clone());
-            }
-        }
-
-        None
+        self.var_scopes
+        .iter()
+        .rev()
+        .flat_map(|scope| scope.iter().rev())
+        .flat_map(|v| if v.borrow().name == name {
+            Some(v.clone())
+        }else {
+            None
+        })
+        .next()
     }
 
     ///
@@ -116,6 +122,8 @@ impl<'a> Parser {
                     init_data: None,
                 }));
                 self.globals.insert(0, var.clone());
+                self.var_scopes.last_mut().unwrap().push(var);
+
                 if let Ok((p1, _)) = p1.take(";") {
                     p = p1;
                     break;
@@ -135,6 +143,9 @@ impl<'a> Parser {
         let (p, ty) = self.typespec(p.consume(0))?;
         let (p, (ty, _)) = self.declarator(p.consume(0), ty)?;
         let mut params: Vec<Rc<RefCell<Variable>>> = vec![];
+
+        self.enter_scope();
+
         let (ty, name) = if let Type::Function(f) = ty.clone() {
             for param in f.params.iter() {
                 let var = Rc::new(RefCell::new(Variable {
@@ -145,6 +156,8 @@ impl<'a> Parser {
                     init_data: None,
                 }));
                 self.locals.insert(0, var.clone());
+                self.var_scopes.last_mut().unwrap().push(var.clone());
+
                 params.insert(0, var.clone())
             }
             (ty, f.name)
@@ -172,6 +185,8 @@ impl<'a> Parser {
             params: params,
             stack_size: 0,
         };
+
+        self.leave_scope();
 
         Ok((p, f))
     }
@@ -307,6 +322,7 @@ impl<'a> Parser {
             p = p3;
 
             self.locals.insert(0, var.clone());
+            self.var_scopes.last_mut().unwrap().push(var.clone());
 
             if let Ok((p4, _)) = p.consume(0).take("=") {
                 p = p4;
@@ -328,6 +344,8 @@ impl<'a> Parser {
     fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let mut nodes = Vec::new();
         let t = p.peek(0).clone();
+        
+        self.enter_scope();
         loop {
             if let Ok((p1, _)) = p.consume(0).take("}") {
                 p = p1;
@@ -341,6 +359,8 @@ impl<'a> Parser {
             p = p2;
             nodes.push(n);
         }
+
+        self.leave_scope();
 
         Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }), t)))
     }
