@@ -94,7 +94,7 @@ impl<'a> Lexer<'a> {
             }
         }
         return Err(Error::ParseError("unclosed string".to_owned(), Token::Illegal(self.ch, self.pos)));
-        }
+    }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
         for keyword in self.keywords.iter() {

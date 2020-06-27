@@ -100,18 +100,22 @@ impl<'a> Parser {
     pub fn parse(&mut self, mut p: Tokens<'a>) -> Result<Program<'a>, Error<'a>> {
         let mut functions: Vec<Rc<RefCell<Function>>> = vec![];
 
+        self.enter_scope();
         loop {
             if let Token::Eof(_) = p.peek(0) {
                 break;
             }
             self.locals = vec![];
-            if let Ok((p1, func)) = self.func(p.consume(0)) {
+
+            let (p1, ty) = self.typespec(p.consume(0))?;
+            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;            
+
+            if let Type::Function(_)= ty {
+                let (p1, func) = self.func(p.consume(0))?;
                 functions.push(Rc::new(RefCell::new(func)));
                 p = p1;
                 continue;
             }
-            let (p1, ty) = self.typespec(p.consume(0))?;
-            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;            
 
             loop {
                 let var = Rc::new(RefCell::new(Variable {
@@ -172,6 +176,7 @@ impl<'a> Parser {
         let (p, stmt) = match self.compound_stmt(p) {
             Ok((p,s)) => (p, s),
             Err(e) => {
+                #[cfg(debug_assertions)]
                 eprintln!("{:?}",e);
                 return Err(e);
             },

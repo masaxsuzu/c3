@@ -44,12 +44,11 @@ fn main() {
             };
             eprintln!(
                 "{}",
-                Error::DisplayError("line".to_string(), file, pos, msg)
+                Error::DisplayError(args[1].to_owned(), file, pos, msg)
             );
             1
         }
-        Err(err) => {
-            eprintln!("{}", err);
+        Err(_) => {
             1
         }
     });
