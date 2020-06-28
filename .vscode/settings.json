@@ -1,0 +1,17 @@
+{
+    "cSpell.words": [
+        "ARGREG",
+        "cond",
+        "codegen",
+        "globl",
+        "noprefix",
+        "imul",
+        "idiv",
+        "sete",
+        "setne",
+        "setl",
+        "setle",
+        "movzx",
+        "movsx"
+    ]
+}

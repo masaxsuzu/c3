@@ -113,7 +113,7 @@ impl<'a> Parser {
             }
             self.locals = vec![];
 
-            let (p1, ty) = self.typespec(p.consume(0))?;
+            let (p1, ty) = self.type_spec(p.consume(0))?;
             let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;
 
             if let Type::Function(_) = ty {
@@ -151,9 +151,9 @@ impl<'a> Parser {
         })
     }
 
-    // func = "typespec" "declarator" compound_stmt
+    // func = "type_spec" "declarator" compound_stmt
     fn func(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Function<'a>), Error<'a>> {
-        let (p, ty) = self.typespec(p.consume(0))?;
+        let (p, ty) = self.type_spec(p.consume(0))?;
         let (p, (ty, _)) = self.declarator(p.consume(0), ty)?;
         let mut params: Vec<Rc<RefCell<Variable>>> = vec![];
 
@@ -302,10 +302,10 @@ impl<'a> Parser {
         Ok((p, Node::ExprStmt(Box::new(Unary { left: n }), t)))
     }
 
-    // declaration = typespec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
+    // declaration = type_spec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
     fn declaration(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let mut nodes = Vec::<Node<'a>>::new();
-        let (mut p, ty) = self.typespec(p.consume(0))?;
+        let (mut p, ty) = self.type_spec(p.consume(0))?;
         let t = p.consume(0).peek(0).clone();
 
         let mut after_second: Option<()> = None;
@@ -581,8 +581,8 @@ impl<'a> Parser {
         }
     }
 
-    /// funcall = ident "(" (assign ("," assign)*)? ")"
-    fn funccall(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
+    /// func_call = ident "(" (assign ("," assign)*)? ")"
+    fn func_call(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let t = p.peek(0).clone();
         let x = if let Token::Identifier(x, _) = p.peek(0) {
             *x
@@ -672,7 +672,7 @@ impl<'a> Parser {
 
         if let Token::Identifier(x, _) = p.peek(0) {
             if let Ok((_, _)) = p.consume(1).take("(") {
-                return self.funccall(p);
+                return self.func_call(p);
             }
             let var = if let Some(v) = self.find_var(x) {
                 v
@@ -734,7 +734,7 @@ impl<'a> Parser {
         ));
     }
 
-    fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>> {
+    fn type_spec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>> {
         if let Ok((p, _)) = p.consume(0).take("char") {
             return Ok((p, Type::Integer(1)));
         }
@@ -820,12 +820,12 @@ impl<'a> Parser {
                 p
             };
 
-            let (p1, basety) = self.typespec(p)?;
-            let (p1, (basety, name)) = self.declarator(p1, basety)?;
+            let (p1, base) = self.type_spec(p)?;
+            let (p1, (base, name)) = self.declarator(p1, base)?;
             p = p1;
             params.push(ParameterType {
                 name: name,
-                ty: basety,
+                ty: base,
             });
         }
     }
