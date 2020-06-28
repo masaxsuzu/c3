@@ -7,7 +7,7 @@ use crate::token::Token;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Unknown,
-    Integer(i64),   // size i
+    Integer(i64),              // size i
     Pointer(Box<PointerType>), // Pointer to X
     Array(Box<ArrayType>),     // Array of X
     Function(Box<FunctionType>),

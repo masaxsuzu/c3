@@ -1,7 +1,7 @@
 use crate::ast::{
     get_base_type, get_type, size_of, ArrayType, Binary, Block, For, Function, FunctionCall,
-    FunctionType, If, Node, Operator1, Operator2, ParameterType, PointerType, Program, Type, Unary,
-    Variable, StmtExpr
+    FunctionType, If, Node, Operator1, Operator2, ParameterType, PointerType, Program, StmtExpr,
+    Type, Unary, Variable,
 };
 use crate::error::Error;
 use crate::token::Token;
@@ -68,7 +68,11 @@ pub struct Parser {
 
 impl<'a> Parser {
     pub fn new() -> Self {
-        Parser { locals: Vec::new(), globals: Vec::new(), var_scopes: Vec::new(), }
+        Parser {
+            locals: Vec::new(),
+            globals: Vec::new(),
+            var_scopes: Vec::new(),
+        }
     }
 
     fn enter_scope(&mut self) {
@@ -81,15 +85,17 @@ impl<'a> Parser {
 
     fn find_var(&self, name: &str) -> Option<Rc<RefCell<Variable>>> {
         self.var_scopes
-        .iter()
-        .rev()
-        .flat_map(|scope| scope.iter().rev())
-        .flat_map(|v| if v.borrow().name == name {
-            Some(v.clone())
-        }else {
-            None
-        })
-        .next()
+            .iter()
+            .rev()
+            .flat_map(|scope| scope.iter().rev())
+            .flat_map(|v| {
+                if v.borrow().name == name {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 
     ///
@@ -108,9 +114,9 @@ impl<'a> Parser {
             self.locals = vec![];
 
             let (p1, ty) = self.typespec(p.consume(0))?;
-            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;            
+            let (mut p1, (mut ty, mut name)) = self.declarator(p1.consume(0), ty)?;
 
-            if let Type::Function(_)= ty {
+            if let Type::Function(_) = ty {
                 let (p1, func) = self.func(p.consume(0))?;
                 functions.push(Rc::new(RefCell::new(func)));
                 p = p1;
@@ -139,7 +145,10 @@ impl<'a> Parser {
                 name = name1;
             }
         }
-        Ok(Program { functions: functions, globals: self.globals.clone() })
+        Ok(Program {
+            functions: functions,
+            globals: self.globals.clone(),
+        })
     }
 
     // func = "typespec" "declarator" compound_stmt
@@ -174,12 +183,12 @@ impl<'a> Parser {
         let (p, _) = p.take("{")?;
 
         let (p, stmt) = match self.compound_stmt(p) {
-            Ok((p,s)) => (p, s),
+            Ok((p, s)) => (p, s),
             Err(e) => {
                 #[cfg(debug_assertions)]
-                eprintln!("{:?}",e);
+                eprintln!("{:?}", e);
                 return Err(e);
-            },
+            }
         };
 
         let f = Function {
@@ -349,14 +358,14 @@ impl<'a> Parser {
     fn compound_stmt(&mut self, mut p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         let mut nodes = Vec::new();
         let t = p.peek(0).clone();
-        
+
         self.enter_scope();
         loop {
             if let Ok((p1, _)) = p.consume(0).take("}") {
                 p = p1;
                 break;
             }
-            let (p2, n) = if let Ok((_,_)) = self.typename(p.consume(0)) {
+            let (p2, n) = if let Ok((_, _)) = self.typename(p.consume(0)) {
                 self.declaration(p)?
             } else {
                 self.stmt(p.consume(0))?
@@ -405,13 +414,15 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("==") {
                 let (p1, right) = self.relational(p1)?;
                 p = p1;
-                left = Self::new_binary_node(left, right, Operator2::Eq, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(left, right, Operator2::Eq, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("!=") {
                 let (p2, right) = self.relational(p2)?;
                 p = p2;
-                left = Self::new_binary_node(left, right, Operator2::Ne, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(left, right, Operator2::Ne, t.clone(), Type::Integer(8));
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -426,26 +437,30 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("<=") {
                 let (p1, right) = self.add(p1)?;
                 p = p1;
-                left = Self::new_binary_node(left, right, Operator2::Le, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(left, right, Operator2::Le, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("<") {
                 let (p2, right) = self.add(p2)?;
                 p = p2;
-                left = Self::new_binary_node(left, right, Operator2::Lt, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(left, right, Operator2::Lt, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p3, _)) = p.consume(0).take(">=") {
                 let (p3, right) = self.add(p3)?;
                 p = p3;
-                left = Self::new_binary_node(right, left, Operator2::Le, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(right, left, Operator2::Le, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p4, _)) = p.consume(0).take(">") {
                 let t = p.peek(0).clone();
                 let (p4, right) = self.add(p4)?;
                 p = p4;
-                left = Self::new_binary_node(right, left, Operator2::Lt, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(right, left, Operator2::Lt, t.clone(), Type::Integer(8));
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -481,13 +496,15 @@ impl<'a> Parser {
             if let Ok((p1, _)) = p.consume(0).take("*") {
                 let (p1, right) = self.unary(p1)?;
                 p = p1;
-                left = Self::new_binary_node(left, right, Operator2::Mul, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(left, right, Operator2::Mul, t.clone(), Type::Integer(8));
                 continue;
             }
             if let Ok((p2, _)) = p.consume(0).take("/") {
                 let (p2, right) = self.unary(p2)?;
                 p = p2;
-                left = Self::new_binary_node(left, right, Operator2::Div, t.clone(), Type::Integer(8));
+                left =
+                    Self::new_binary_node(left, right, Operator2::Div, t.clone(), Type::Integer(8));
                 continue;
             }
             return Ok((p.consume(0), left));
@@ -502,14 +519,22 @@ impl<'a> Parser {
             let (p, left) = self.unary(p)?;
             return Ok((
                 p,
-                self.new_add_node(left, Node::Number(0, t.clone(), Type::Integer(8)), t.clone())?,
+                self.new_add_node(
+                    left,
+                    Node::Number(0, t.clone(), Type::Integer(8)),
+                    t.clone(),
+                )?,
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("-") {
             let (p, right) = self.unary(p)?;
             return Ok((
                 p,
-                self.new_sub_node(Node::Number(0, t.clone(), Type::Integer(8)), right, t.clone())?,
+                self.new_sub_node(
+                    Node::Number(0, t.clone(), Type::Integer(8)),
+                    right,
+                    t.clone(),
+                )?,
             ));
         }
         if let Ok((p, _)) = p.consume(0).take("&") {
@@ -614,12 +639,20 @@ impl<'a> Parser {
             let last = body.nodes.last();
             let ty = if let Some(Node::ExprStmt(node, _)) = last {
                 get_type(&node.left)?
-            }
-            else {
-                return Err(Error::ParseError("statement expression returning void is not supported".to_owned(), t));
+            } else {
+                return Err(Error::ParseError(
+                    "statement expression returning void is not supported".to_owned(),
+                    t,
+                ));
             };
 
-            let node = Node::StmtExpr(Box::new(StmtExpr { ty: ty, nodes: body.nodes}) , t);
+            let node = Node::StmtExpr(
+                Box::new(StmtExpr {
+                    ty: ty,
+                    nodes: body.nodes,
+                }),
+                t,
+            );
             let (p, _) = p.take(")")?;
             return Ok((p, node));
         }
@@ -654,7 +687,7 @@ impl<'a> Parser {
 
         if let Token::Str(s, _) = p.peek(0) {
             let tok = p.peek(0);
-            // NULL is not included in token, then 
+            // NULL is not included in token, then
             // append NULL at end.
             let v = Variable {
                 ty: Type::Array(Box::new(ArrayType {
@@ -662,7 +695,7 @@ impl<'a> Parser {
                     len: 1 + s.len() as i64,
                 })),
                 name: format!(".L.data.{}", self.globals.len()),
-                is_local : false,
+                is_local: false,
                 offset: 0,
                 init_data: Some(format!("{}\0", s.to_string())),
             };
@@ -687,17 +720,20 @@ impl<'a> Parser {
     ///
 
     // typename = "char" | "int"
-    
-    fn typename(&self, p: Tokens<'a>) ->  Result<(Tokens<'a>, Node<'a>), Error<'a>> {
+
+    fn typename(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
         if let Ok((p, t)) = p.consume(0).take("char") {
             return Ok((p, t));
         }
         if let Ok((p, t)) = p.consume(0).take("int") {
             return Ok((p, t));
         }
-        return Err(Error::ParseError("not type name".to_owned(), p.consume(0).peek(0).clone()));
+        return Err(Error::ParseError(
+            "not type name".to_owned(),
+            p.consume(0).peek(0).clone(),
+        ));
     }
-    
+
     fn typespec(&self, p: Tokens<'a>) -> Result<(Tokens<'a>, Type), Error<'a>> {
         if let Ok((p, _)) = p.consume(0).take("char") {
             return Ok((p, Type::Integer(1)));
@@ -919,7 +955,9 @@ impl<'a> Parser {
                 ),
                 Operator2::Sub,
                 t,
-                Type::Pointer(Box::new(PointerType { ty: Type::Integer(8) })),
+                Type::Pointer(Box::new(PointerType {
+                    ty: Type::Integer(8),
+                })),
             )),
             (Type::Array(of), Type::Integer(_)) => Ok(Self::new_binary_node(
                 left,

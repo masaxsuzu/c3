@@ -6,7 +6,7 @@ pub enum Token<'a> {
 
     Number(i64, usize),
     Str(String, usize),
-    
+
     Identifier(&'a str, usize),
 
     Reserved(&'a str, usize),

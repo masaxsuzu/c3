@@ -18,7 +18,9 @@ impl<'a> Lexer<'a> {
             pos: 0,
             next_pos: 0,
             ch: 0,
-            keywords: ["return", "if", "else", "for", "while", "int", "char", "sizeof"],
+            keywords: [
+                "return", "if", "else", "for", "while", "int", "char", "sizeof",
+            ],
             two_letter_punctuations: ["==", "!=", "<=", ">="],
             one_letter_punctuations: [
                 "+", "-", "*", "/", "&", "=", "!", "<", ">", ";", "=", "(", ")", "{", "}", ",",
@@ -85,15 +87,16 @@ impl<'a> Lexer<'a> {
                     'e' => 27 as char,
                     c => c,
                 });
-            } 
-            else if c == '\\' {
-                    escape_next = true;
-            } 
-            else { 
+            } else if c == '\\' {
+                escape_next = true;
+            } else {
                 v.push(c);
             }
         }
-        return Err(Error::ParseError("unclosed string".to_owned(), Token::Illegal(self.ch, self.pos)));
+        return Err(Error::ParseError(
+            "unclosed string".to_owned(),
+            Token::Illegal(self.ch, self.pos),
+        ));
     }
 
     fn consume_keyword(&mut self, start: u8) -> Token<'a> {
@@ -150,11 +153,11 @@ impl<'a> Lexer<'a> {
             }
             let end_pos = self.pos;
             self.read_n(1);
-            return Token::Comment(start_pos, end_pos, self.pos)
+            return Token::Comment(start_pos, end_pos, self.pos);
         }
         if self.starts_with("/*") {
             self.read_n(2);
-            while !self.starts_with("*/")  || self.pos >= self.input.len() - 1 {
+            while !self.starts_with("*/") || self.pos >= self.input.len() - 1 {
                 self.read_n(1);
             }
             let end_pos = self.pos;

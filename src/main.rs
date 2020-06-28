@@ -5,9 +5,9 @@ use c3::lexer::Lexer;
 use c3::parser::{Parser, Tokens};
 use c3::token::Token;
 use std::env;
-use std::rc::Rc;
 use std::fs::read_to_string;
 use std::path::Path;
+use std::rc::Rc;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -35,7 +35,7 @@ fn main() {
         Err(Error::ParseError(msg, token)) => {
             let pos = match token {
                 Token::Eof(p) => p,
-                Token::Comment(_,_, p) => p,
+                Token::Comment(_, _, p) => p,
                 Token::Identifier(_, p) => p,
                 Token::Illegal(_, p) => p,
                 Token::Number(_, p) => p,
@@ -48,8 +48,6 @@ fn main() {
             );
             1
         }
-        Err(_) => {
-            1
-        }
+        Err(_) => 1,
     });
 }

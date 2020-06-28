@@ -39,7 +39,7 @@ impl CodeGenerator {
             print!("{}:\n", g.clone().name);
             if let Some(x) = &g.init_data {
                 for e in x.chars() {
-                    print!("  .byte {}\n", e as u32);                    
+                    print!("  .byte {}\n", e as u32);
                 }
             } else {
                 print!("  .zero {}\n", size_of(g.clone().ty));
@@ -71,10 +71,10 @@ impl CodeGenerator {
                 match size_of(var.borrow().ty.clone()) {
                     1 => {
                         print!("  mov [rbp-{}], {}\n", var.borrow().offset, ARGREG08[i]);
-                    },
-                    _ => {                        
+                    }
+                    _ => {
                         print!("  mov [rbp-{}], {}\n", var.borrow().offset, ARGREG64[i]);
-                    },
+                    }
                 }
             }
 
@@ -219,7 +219,7 @@ impl CodeGenerator {
                 for node in stmt.nodes.iter() {
                     t = self.gen_stmt(node, t, function);
                 }
-                return t + 1
+                return t + 1;
             }
             Node::Assign(node, _, ty) => {
                 let top = self.gen_expr(&node.right, top, function);
@@ -321,7 +321,11 @@ fn load(top: usize, ty: &Type) -> usize {
         return top;
     }
     if size_of(ty.clone()) == 1 {
-        print!("  movsx {}, byte ptr [{}]\n", REG64[top - 1], REG64[top - 1]);
+        print!(
+            "  movsx {}, byte ptr [{}]\n",
+            REG64[top - 1],
+            REG64[top - 1]
+        );
     } else {
         print!("  mov {}, [{}]\n", REG64[top - 1], REG64[top - 1]);
     }
@@ -332,10 +336,10 @@ fn store(top: usize, ty: &Type) -> usize {
     match size_of(ty.clone()) {
         1 => {
             print!("  mov [{}], {}\n", REG64[top - 1], REG64[top - 2]);
-        },
+        }
         _ => {
             print!("  mov [{}], {}\n", REG64[top - 1], REG64[top - 2]);
-        },
+        }
     }
     top - 1
 }
