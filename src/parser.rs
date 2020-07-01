@@ -379,9 +379,16 @@ impl<'a> Parser {
         Ok((p, Node::BlockStmt(Box::new(Block { nodes: nodes }), t)))
     }
 
-    /// expr = assign
+    /// expr = assign ("," expr)?
     fn expr(&mut self, p: Tokens<'a>) -> Result<(Tokens<'a>, Node<'a>), Error<'a>> {
-        self.assign(p)
+        let tok = p.consume(0).peek(0).clone();
+        let (p, assign) = self.assign(p)?;
+        if let Ok((p, _)) = p.consume(0).take(",") {
+            let(p, expr) = self.expr(p)?;
+            let ty = get_type(&expr)?;
+            return Ok((p, Self::new_binary_node(assign,expr,Operator2::Comma, tok, ty)));
+        }
+        Ok((p,assign))
     }
 
     /// assign = equality ("=" assign)?

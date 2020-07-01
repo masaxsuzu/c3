@@ -51,6 +51,7 @@ pub enum Operator2 {
     Ne,
     Lt,
     Le,
+    Comma,
 }
 
 #[derive(Debug, Clone, PartialEq)]

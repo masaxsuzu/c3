@@ -235,6 +235,11 @@ impl CodeGenerator {
                 let top = self.gen_addr(&node.left, top, function);
                 top
             }
+            Node::Binary(node, Operator2::Comma, _, _) => {
+                let top = self.gen_expr(&node.left, top, function) - 1;
+                let top = self.gen_expr(&node.right, top, function);
+                top
+            }
             Node::Binary(node, op, _, _) => {
                 let top = self.gen_expr(&node.left, top, function);
                 let top = self.gen_expr(&node.right, top, function);
@@ -271,6 +276,9 @@ impl CodeGenerator {
                         print!("  setle al\n");
                         print!("  movzx {}, al\n", rd);
                     }
+                    _ => {
+
+                    }
                 }
                 return top - 1;
             }
@@ -284,6 +292,10 @@ impl CodeGenerator {
         }
         if let Node::Unary(deref, Operator1::Deref, _, _) = node {
             return self.gen_expr(&deref.left, top, function);
+        }
+        if let Node::Binary(bin, Operator2::Comma, _, _) = node {
+            let top = self.gen_expr(&bin.left, top, function) - 1;
+            return self.gen_addr(&bin.right, top, function);
         }
         unreachable!("{:?}", node);
     }
